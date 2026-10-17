@@ -376,6 +376,8 @@ class RotaryPositionalEmbedding(nn.Module):
         self.base = base
         self.base_dim = base_dim
         self.max_seq_len = max_seq_len
+        self.cos = None
+        self.sin = None
 
     def forward(self, x: Tensor, pos: int = 0, inverse: bool = False) -> Tensor:
         """
@@ -384,24 +386,22 @@ class RotaryPositionalEmbedding(nn.Module):
         inverse: inverse rotation
         """
         seq_len = x.size(-2)
-        if self.max_seq_len >= 0:
-            if not hasattr(self, "cos"):
-                cos, sin = self.calculate_cos_sin(
-                    0, self.max_seq_len, x.device, x.dtype
+        if self.max_seq_len > 0:
+            if self.cos is None or self.cos.device != x.device:
+                self.cos, self.sin = self.calculate_cos_sin(
+                    0, self.max_seq_len, x.device
                 )
-                self.register_buffer("cos", cos, persistent=False)
-                self.register_buffer("sin", sin, persistent=False)
             cos = self.cos[pos : pos + seq_len, :]
             sin = self.sin[pos : pos + seq_len, :]
         else:
-            cos, sin = self.calculate_cos_sin(pos, seq_len, x.device, x.dtype)
+            cos, sin = self.calculate_cos_sin(pos, seq_len, x.device)
         return self.apply_rope(x, cos, sin, inverse)
 
     def extra_repr(self):
         return f"dim_rope={self.dim_rope}, max_seq_len={self.max_seq_len}, online={self.max_seq_len == 0}"
 
-    def calculate_cos_sin(self, pos, seq_len, device, dtype) -> Tensor:
-        assert dtype is torch.float
+    def calculate_cos_sin(self, pos, seq_len, device):
+        dtype = torch.float32
         theta = self.base ** -(
             torch.arange(0, self.dim_rope, 2, device=device, dtype=dtype)
             / self.base_dim
@@ -413,8 +413,8 @@ class RotaryPositionalEmbedding(nn.Module):
         return cos, sin
 
     def apply_rope(self, x: Tensor, cos, sin, inverse=False):
-        assert x.dtype is torch.float
-        x_rope = x[..., : self.dim_rope]
+        dtype = x.dtype
+        x_rope = x[..., : self.dim_rope].to(torch.float32)
         x_rope_pairs = x_rope.unflatten(-1, (-1, 2))
         x0 = x_rope_pairs[..., 0]
         x1 = x_rope_pairs[..., 1]
@@ -424,7 +424,7 @@ class RotaryPositionalEmbedding(nn.Module):
         else:
             out0 = x0 * cos - x1 * sin
             out1 = x1 * cos + x0 * sin
-        x_rope_out = torch.stack([out0, out1], dim=-1).flatten(-2)
+        x_rope_out = torch.stack([out0, out1], dim=-1).flatten(-2).to(dtype)
         return torch.cat([x_rope_out, x[..., self.dim_rope :]], dim=-1)
 
 
