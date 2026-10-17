@@ -19,7 +19,7 @@
 \usepackage{caption}
 
 
-\title{ConvPE Substantially Improves Transformers}
+\title{ConvPE Improves Transformer with 3x Parameter Efficiency}
 \date{}
 \newif\ifuniqueAffiliation
 \uniqueAffiliationtrue
@@ -92,19 +92,26 @@ Existing position embedding schemes can be roughly divided into five categories:
 
 
 \section{Method}
+
 ConvPE is a convolutional attention score bias method. Its goal is to construct an attention score bias tensor $\mathbf{B_{ConvPE}}\in\mathbb{R}^{B\times H\times T\times W}$ for self-attention tokens within the convolution window. Tokens outside the window use no attention score bias.
+
+\begin{figure}[!ht]
+    \centering
+    \begin{minipage}{0.20\textwidth}
+    \includegraphics[width=\linewidth]{FIGURES/attn_score_bias.png}
+    \end{minipage}
+\end{figure}
 
 \begin{equation*}
 \mathbf{B}^{b,h,t,s}=
 \begin{cases}
-\mathbf{B}_{\mathrm{ConvPE}}^{b,h,t,w}, & w\in [0,W-1]\\
+\mathbf{B}_{\mathrm{ConvPE}}^{b,h,t,w}, & w\in [0,W-1] , w=s-t+W-1\\
 0, & \text{otherwise}.
 \end{cases}
 \end{equation*}
 
-$$
-w=s-t+W-1
-$$
+
+
 
 The hyperparameters include:
 \begin{itemize}
@@ -120,7 +127,7 @@ $$
 \mathbf{B}_{ConvPE}=\mathbf{B}_{s}+\mathbf{B}_{h}
 $$
 
-\subsection{Shared}
+\subsection{Shared Projection}
 
 The shared projection layer $W_s$ is used to downsample $X$. To adapt to the convolution layer input format $(B,C,T)$, the last two dimensions need to be swapped:
 
@@ -141,7 +148,7 @@ Note that unflatten $O_{s}\in \mathbb{R}^{B \times C \times T }$ into $O_{s}\in 
 
 The projection parameter count is $D \times C_{s}$, and the convolution parameter count is $W^2 \times H \times C_{s} / G_{s}$.
 
-\subsection{Headwise}
+\subsection{Headwise Projection Shared Convolution}
 
 The Headwise projection layer $W_h$ is used to downsample $X$:
 
