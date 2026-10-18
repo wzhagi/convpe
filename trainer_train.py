@@ -53,7 +53,7 @@ if tokenizer.pad_token is None:
 def main(cfg: dict | None = None):
     DEFAULTS = {
         "output_dir": "results",
-        "epochs": 10,
+        "epochs": 1,
         "batch_size": 4,
         "lr": 3e-4,
         "block_size": 1024,
