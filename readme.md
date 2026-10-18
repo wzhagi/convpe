@@ -10,8 +10,8 @@ ConvPE substantially improves Transformers parameter efficiency and training eff
 |model|CIFAR-10 val acc|CIFAR-100 val acc|
 |:-:|:-:|:-:|
 |RoPE baseline 5.3M|0.906|0.630|
-|ConvPE 3x3 5.4M|**0.915**|6.47|
-|ConvPE 5x5 5.5M|0.908|**6.48**|
+|ConvPE 3x3 5.4M|**0.915**|0.647|
+|ConvPE 5x5 5.5M|0.908|**0.648**|
 
 ## Requirements
     apt install python3-dev
