@@ -18,26 +18,35 @@ ConvPE substantially improves Transformers parameter efficiency and training eff
     pip install -r requirements.txt
 
 ## Configration (Optional)
-    edit trainer_train.py main function
-    edit cifar_convpe.py file
+Default to train tiny model on WikiText-103 for 1 epoch
+
+    # edit trainer_train.py main function
+    DEFAULTS = {
+        "output_dir": "results",
+        "epochs": 1,
+        "batch_size": 4,
+        "lr": 3e-4,
+        "block_size": 1024,
+        "num_workers": 4,
+    }
+    configs = []
+    configs.append(...)
+
+Default to train tiny model on CIFAR-10,CIFAR-100 for 100 epochs
+
+    # edit train_cifar.py main part
+    if __name__ == "__main__":
+        configs = []
+        configs.append(...)
 
 ## Training
-    ./trainer_train.py
-    ./cifar_train.py
 
-## FP8 Training
-    install transformer engine or use it's dorker image (recomanded)
-<https://catalog.ngc.nvidia.com/orgs/nvidia/-/containers/pytorch/->
+Delete results. (Optional, results folders and files may cause training to be automatically skipped.)
 
-    edit transformer_convpe.py
+    rm -rf results 
 
-    import transformer_engine.pytorch as te
-    from transformer_engine.common.recipe import Float8BlockScaling
+Start training:    
 
-    Annotate CausualTransformer forward with te.autocast
+    python3 trainer_train.py
 
-    @te.autocast(recipe=Float8BlockScaling())
-    def forward(self, x: Tensor) -> Tensor:
-    
-    change MQA wq, wo from nn.Linear to te.Linear
-    change FFN to te.LayerNormMLP
+    python3 cifar_train.py
