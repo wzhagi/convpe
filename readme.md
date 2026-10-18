@@ -1,7 +1,7 @@
 # ConvPE
-ConvPE 卷积位置编码显著提升了Transformer的参数效率和训练性能。3.2%的额外参数和大致等比例的计算，换取16.3%的训练loss下降，从2.60降到2.22。
+ConvPE 卷积位置编码显著提升了Transformer的参数效率和训练性能。3.2%的额外参数和大致等比例的计算，换取14.6%的训练loss下降，从2.60降到2.22。
 
-ConvPE (convolutional positional encoding) substantially improves both the parameter efficiency and training performance of Transformers. At the cost of only 3.2% additional parameters and roughly proportional computation, it achieves a 16.3% reduction in training loss, decreasing from 2.60 to 2.22.
+ConvPE (convolutional positional encoding) substantially improves both the parameter efficiency and training performance of Transformers. At the cost of only 3.2% additional parameters and roughly proportional computation, it achieves a 14.6% reduction in training loss, decreasing from 2.60 to 2.22.
 
 ![](/paper/FIGURES/attn_score_bias.png)
 ## Training curves on WikiText-103 for 10 epochs
