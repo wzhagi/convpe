@@ -299,13 +299,15 @@ We searched hyperparameters in the neighborhood of $s16g16h4g1$. Table \ref{tab:
 
 \subsubsection{No-Projection Configurations}
 
-$sx$ means removing $W_{s}$ and using $X$ as the projection layer output.
+$sx$ means removing $W_{s}$ and using layer input $X$ as the shared projection layer output.
 
-$hx$ means removing $W_{h}$ and using $X$ as the projection layer output.
+$hx$ means removing $W_{h}$ and using layer input $X$ as the headwise projection layer output.
 
 Theoretically, any linear mapping $W \times D \rightarrow H \times W$ is equivalent to $sxg1$ while other configurations are its low-rank representations. The parameter count then becomes $W^2 \times H \times D$, which is too large and can only be tried with small windows or extremely large models.
 
 Table \ref{tab:4} shows that both no-projection configurations perform worse. However, removing the shared projection layer can improve parameter efficiency.
+
+In additional experiments, we set query $Q$ as the head-wise projection layer output\cite{chang2021convolutionsselfattentionreinterpretingrelative} and key-value $K=V$ as the shared projection layer output. Both variants underperformed the setting using the layer input X as the projection layer output.
 
 \begin{table}[!ht]
     \centering
