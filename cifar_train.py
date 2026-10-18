@@ -195,6 +195,7 @@ def train(epochs, batch_size, learn_rate, model, seed, dataset, config, **kwargs
         dataset["train"],
         batch_size,
         shuffle=True,
+        generator=torch.Generator().manual_seed(seed),
         num_workers=6,
         pin_memory=True,
         persistent_workers=True,
