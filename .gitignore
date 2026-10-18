@@ -1,4 +1,7 @@
 __pycache__
 .venv
 data
-results
+*.pt
+*.pth
+*.bin
+*.safetensors

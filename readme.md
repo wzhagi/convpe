@@ -18,6 +18,7 @@ ConvPE substantially improves Transformers parameter efficiency and training eff
     pip install -r requirements.txt
 
 ## Configration (Optional)
+### WikiText
 Default to train tiny model on WikiText-103 for 1 epoch
 
     # edit trainer_train.py main function
@@ -31,7 +32,7 @@ Default to train tiny model on WikiText-103 for 1 epoch
     }
     configs = []
     configs.append(...)
-
+### CIFAR
 Default to train tiny model on CIFAR-10,CIFAR-100 for 100 epochs
 
     # edit train_cifar.py main part
@@ -41,11 +42,13 @@ Default to train tiny model on CIFAR-10,CIFAR-100 for 100 epochs
 
 ## Training
 
-Delete results. (Optional, results folders and files may cause training to be automatically skipped.)
+### Delete the "results" folder or its sub-folders. (Optional)
 
-    rm -rf results 
+My results for comparison are in the "wzh_results" folder.
 
-Start training:    
+Sub-folders and files in the "results" folder may cause training to be automatically skipped.
+
+### Start training    
 
     python3 trainer_train.py
 

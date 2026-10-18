@@ -1,0 +1,27 @@
+{
+  "architectures": [
+    "LanguageModel"
+  ],
+  "bos_token_id": 50256,
+  "convpe_dim_headwise": 4,
+  "convpe_dim_shared": 16,
+  "convpe_groups_headwise": 1,
+  "convpe_groups_shared": 16,
+  "convpe_window_size": 128,
+  "dim_head": 64,
+  "dim_model": 192,
+  "dim_rope": 0,
+  "dtype": "float32",
+  "eos_token_id": 50256,
+  "max_seq_len": 1024,
+  "model_type": "language_model",
+  "name": "tiny_nope_w128s16g16h4g1",
+  "num_heads": 3,
+  "num_layers": 12,
+  "pad_token_id": 50256,
+  "seed": 42,
+  "tie_word_embeddings": true,
+  "transformers_version": "5.19.0",
+  "use_cache": false,
+  "vocab_size": 50257
+}

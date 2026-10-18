@@ -62,7 +62,8 @@ def main(cfg: dict | None = None):
     args = argparse.Namespace(**{**DEFAULTS, **(cfg or {})})
     configs = []
     eval_dirs = []
-    # eval_dirs.append("results/base_rope_42")
+    eval_dirs.append("results/tiny_rope_42")
+    eval_dirs.append("results/tiny_nope_w128s16g16h4g1_42")
 
     tiny_nope = LanguageModelConfig(
         name="tiny_nope",
@@ -114,7 +115,7 @@ def main(cfg: dict | None = None):
 
     configs.append(tiny_rope)
     configs.append(convpe_config(tiny_nope, "w128s16g16h4g1"))
-    configs.append(convpe_config(tiny_rope, "w128s16g16h4g1"))
+    # configs.append(convpe_config(tiny_rope, "w128s16g16h4g1"))
     
     # configs.append(base_rope)
     # configs.append(convpe_config(base_nope, "w128s16g16h4g1"))
