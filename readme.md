@@ -29,8 +29,15 @@ ConvPE substantially improves Transformers parameter efficiency and training eff
     install transformer engine or use it's dorker image (recomanded)
 <https://catalog.ngc.nvidia.com/orgs/nvidia/-/containers/pytorch/->
 
-    edit trainer_model.py
-    change
-    from transformer_convpe import *
-    to
-    from transformer_convpe_fp8 import *
+    edit transformer_convpe.py
+
+    import transformer_engine.pytorch as te
+    from transformer_engine.common.recipe import Float8BlockScaling
+
+    Annotate CausualTransformer forward with te.autocast
+
+    @te.autocast(recipe=Float8BlockScaling())
+    def forward(self, x: Tensor) -> Tensor:
+    
+    change MQA wq, wo from nn.Linear to te.Linear
+    change FFN to te.LayerNormMLP

@@ -67,7 +67,7 @@ def main(cfg: dict | None = None):
     tiny_nope = LanguageModelConfig(
         name="tiny_nope",
         seed=42,
-        num_layers=6,
+        num_layers=12,
         dim_model=192,
         num_heads=3,
         dim_head=64,
@@ -111,10 +111,14 @@ def main(cfg: dict | None = None):
         config.convpe_dim_headwise = h
         config.convpe_groups_headwise = gh
         return config
+
+    configs.append(tiny_rope)
+    configs.append(convpe_config(tiny_nope, "w128s16g16h4g1"))
+    configs.append(convpe_config(tiny_rope, "w128s16g16h4g1"))
     
-    configs.append(base_rope)
-    configs.append(convpe_config(base_nope, "w128s16g16h4g1"))
-    configs.append(convpe_config(base_rope, "w128s16g16h4g1"))
+    # configs.append(base_rope)
+    # configs.append(convpe_config(base_nope, "w128s16g16h4g1"))
+    # configs.append(convpe_config(base_rope, "w128s16g16h4g1"))
 
 
     print("========== configs to be trained ==========")
