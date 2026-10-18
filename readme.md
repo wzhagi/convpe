@@ -1,12 +1,17 @@
 # ConvPE
-ConvPE substantially improves Transformers parameter efficiency and training efficiency by Convolutional Position Embedding.
+ConvPE substantially improves Transformers parameter efficiency and training efficiency by Convolutional Position Embedding. ConvPE achieves substantial reductions in validation loss compared with the Rotary Position Embedding (RoPE) baseline, while adding only a small number of backbone parameters (+0.15% params, -3.83% loss; +1.87% params, -8.03% loss). As model scale increases, the best configuration achieves a 10.3% loss reduction with only a 4.34% increase in backbone parameters, demonstrating high performance and parameter efficiency. ConvPE uses convolution to generate attention score biases, making it compatible with various Transformer architectures and high-dimensional modalities.
+
 ![](/paper/FIGURES/attn_score_bias.png)
-## Training curve on WikiText-103 for 10 epochs
+## Training curves on WikiText-103 for 10 epochs
 
 ![](/main_figure.png)
 
-## Abstract
-Convolutional Position Embedding (ConvPE) achieves substantial reductions in validation loss compared with the Rotary Position Embedding (RoPE) baseline, while adding only a small number of backbone parameters (+0.15% params, -3.83% loss; +1.87% params, -8.03% loss). As model scale increases, the best configuration achieves a 10.3% loss reduction with only a 4.34% increase in backbone parameters, demonstrating high performance and parameter efficiency. ConvPE uses convolution to generate attention score biases, making it compatible with various Transformer architectures and high-dimensional modalities.
+## ConvPE2D effectiveness verification in CIFAR-10, CIFAR-100.
+|model|CIFAR-10 val acc|CIFAR-100 val acc|
+|:-:|:-:|:-:|
+|RoPE baseline 5.3M|0.906|0.630|
+|ConvPE 3x3 5.4M|**0.915**|6.47|
+|ConvPE 5x5 5.5M|0.908|**6.48**|
 
 ## Requirements
     apt install python3-dev
@@ -19,3 +24,13 @@ Convolutional Position Embedding (ConvPE) achieves substantial reductions in val
 ## Training
     ./trainer_train.py
     ./cifar_train.py
+
+## FP8 Training
+    install transformer engine or use it's dorker image (recomanded)
+<https://catalog.ngc.nvidia.com/orgs/nvidia/-/containers/pytorch/->
+
+    edit trainer_model.py
+    change
+    from transformer_convpe import *
+    to
+    from transformer_convpe_fp8 import *

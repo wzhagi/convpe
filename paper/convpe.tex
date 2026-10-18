@@ -34,7 +34,7 @@
 \maketitle
 
 \begin{abstract}
-	Convolutional Position Embedding (ConvPE) achieves substantial reductions in validation loss compared with the Rotary Position Embedding (RoPE) baseline, while adding only a small number of backbone parameters (+0.15\% params, -3.83\% loss; +1.87\% params, -8.03\% loss). As model scale increases, the best configuration achieves a 10.3\% loss reduction with only a 4.34\% increase in backbone parameters, demonstrating high performance and parameter efficiency. ConvPE uses convolution to generate attention score biases, making it compatible with various Transformer architectures and high-dimensional modalities. The code for ConvPE is publicly available at \url{https://github.com/wzhagi/convpe}.
+	ConvPE substantially improves Transformers parameter efficiency and training efficiency by Convolutional Position Embedding. ConvPE achieves substantial reductions in validation loss compared with the Rotary Position Embedding (RoPE) baseline, while adding only a small number of backbone parameters (+0.15\% params, -3.83\% loss; +1.87\% params, -8.03\% loss). As model scale increases, the best configuration achieves a 10.3\% loss reduction with only a 4.34\% increase in backbone parameters, demonstrating high performance and parameter efficiency. ConvPE uses convolution to generate attention score biases, making it compatible with various Transformer architectures and high-dimensional modalities. The code for ConvPE is publicly available at \url{https://github.com/wzhagi/convpe}.
 \end{abstract}
 \keywords{Position Embedding \and Language Models \and Transformers \and Attention}
 
@@ -148,7 +148,7 @@ Note that unflatten $O_{s}\in \mathbb{R}^{B \times C \times T }$ into $O_{s}\in 
 
 The projection parameter count is $D \times C_{s}$, and the convolution parameter count is $W^2 \times H \times C_{s} / G_{s}$.
 
-\subsection{Headwise Projection Shared Convolution}
+\subsection{Headwise Projection}
 
 The Headwise projection layer $W_h$ is used to downsample $X$:
 
@@ -325,7 +325,7 @@ Table \ref{tab:4} shows that both no-projection configurations perform worse. Ho
     \end{minipage}
 \end{table}
 
-\begin{figure}
+\begin{figure}[!ht]
     \centering
     \begin{minipage}[t]{0.98\textwidth}
     \includegraphics[width=\linewidth]{FIGURES/train_dynamics.png}
@@ -340,6 +340,14 @@ We trained ConvPE models and a RoPE baseline from scratch on WikiText-103 for 10
 
 While ConvPE fundamentally outperforms the baseline, the performance gap between its RoPE and NoPE variants is marginal, though their generalization dynamics differ slightly. In low-epoch scenarios, the NoPE variant achieves a lower validation loss, indicating better early-stage generalization compared to its RoPE counterpart. Conversely, under multi-epoch training conditions, the RoPE variant catches up and yields a slightly lower generalization loss (e.g., 3.1623 vs. 3.1676 at epoch 6), and shows less overfitting with similar training loss. Additionally, regarding training set optimization, the NoPE variant maintains a consistently lower training loss than the RoPE variant throughout the entire training process.
 
+\subsection{2D Vision Position Embedding}
+
+To produce 2D positional embeddings, we use 2D convolutional layers. Instead of using a local windowed attention bias $\mathbf{B_{ConvPE}}\in\mathbb{R}^{B\times H\times T\times W}$, we use a global attention bias $\mathbf{B_{ConvPE2D}}\in\mathbb{R}^{B\times H\times T\times T}$, where $T$ is the sequence length after embedding the image. Note that the input window size $W$ and the output window size $W_{out}$ in output channel dimension of the convolution layer can be different.
+
+We trained Multi-Head Attention (MHA) ViT-Tiny\cite{dosovitskiy2021image} models with configuration $N_{layers}=12$, $D_{model}=192$, $N_{heads}=3$, $D_{head}=64$. ConvPE2D configuration is still $s16g16h4g1$ but with $W_{out}=T$. We used the Muon\cite{jordan2024muon} optimizer to optimize the 2D parameters, excluding the embedding layer, with a learning rate of 3e-3, while the remaining parameters were optimized with AdamW at a learning rate of 3e-4. We trained the models on CIFAR-10 and CIFAR-100\cite{krizhevsky2009learning} for 100 epochs with batch\_size=256, patch\_shape=(4,4).
+
+Table \ref{tab:5} shows that ConvPE transfers effectively to Vision Transformers and outperforms the RoPE baseline. Increasing the window size improves validation accuracy on the harder dataset CIFAR-100, while CIFAR-10 remains nearly saturated and favors the smaller w3 window.
+
 \begin{table}[!ht]
     \centering
     \begin{minipage}[t]{0.48\textwidth}
@@ -349,23 +357,15 @@ While ConvPE fundamentally outperforms the baseline, the performance gap between
             \toprule
             config & params & CIFAR-10 & CIFAR-100 \\
             \midrule
-            baseline    & 5.3M & 0.909 & 0.631 \\
-            ConvPE2D w3 & 5.4M & \textbf{0.915} & 0.641 \\
-            ConvPE2D w5 & 5.5M & 0.906 & \textbf{0.653} \\
+            baseline    & 5.3M & 0.906 & 0.630 \\
+            ConvPE2D w3 & 5.4M & \textbf{0.915} & 0.647 \\
+            ConvPE2D w5 & 5.5M & 0.908 & \textbf{0.648} \\
             \bottomrule
         \end{tabular}
         \captionof{table}{Validation accuracy for 2D vision experiments on CIFAR-10 and CIFAR-100}
         \label{tab:5}
     \end{minipage}
 \end{table}
-
-\subsection{2D Vision Position Embedding}
-
-To produce 2D positional embeddings, we use 2D convolutional layers. Instead of using a local windowed attention bias $\mathbf{B_{ConvPE}}\in\mathbb{R}^{B\times H\times T\times W}$, we use a global attention bias $\mathbf{B_{ConvPE2D}}\in\mathbb{R}^{B\times H\times T\times T}$, where $T$ is the sequence length after embedding the image. Note that the input window size $W$ and the output window size $W_{out}$ in output channel dimension of the convolution layer can be different.
-
-We trained Multi-Head Attention (MHA) ViT-Tiny\cite{dosovitskiy2021image} models with configuration $N_{layers}=12$, $D_{model}=192$, $N_{heads}=3$, $D_{head}=64$. ConvPE2D configuration is still $s16g16h4g1$ but with $W_{out}=T$. We used the Muon\cite{jordan2024muon} optimizer to optimize the 2D parameters, excluding the embedding layer, with a learning rate of 3e-3, while the remaining parameters were optimized with AdamW at a learning rate of 3e-4. We trained the models on CIFAR-10 and CIFAR-100\cite{krizhevsky2009learning} for 100 epochs with batch\_size=256, patch\_shape=(4,4).
-
-Table \ref{tab:5} shows that ConvPE transfers effectively to Vision Transformers and outperforms the RoPE baseline. Increasing the window size improves validation accuracy on the harder dataset CIFAR-100, while CIFAR-10 remains nearly saturated and favors the smaller w3 window.
 
 \section{Conclusions and Future Work}
 
@@ -380,7 +380,7 @@ Based on our experiments, we summarize the following practical tuning guidelines
 
 ConvPE is compatible with different attention masks and KV-cache concatenation, and it naturally supports multidimensional extension. Future work can explore the following directions:
 \begin{itemize}
-    \item \textbf{Kernel fusion}. Develop high performance kernels for ConvPE.
+    \item \textbf{Optimized kernels}. ConvPE incurs a computational cost increase that is only slightly higher than its parameter increase; with high-performance kernels, its training time can be further reduced.
 	\item \textbf{Scaling behavior.} Investigate ConvPE with larger Transformers and datasets, and identify configuration patterns at scale.
 	\item \textbf{Long-context modeling.} Evaluate ConvPE in long-context settings, where positional generalization is particularly important.
 	\item \textbf{Architectural integration.} Combine ConvPE with Sliding Window Attention (SWA)\cite{beltagy2020longformer}, Compressed Sparse Attention (CSA)\cite{deepseek2026v4}, and other Transformer variants.
