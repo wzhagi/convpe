@@ -34,7 +34,7 @@
 \maketitle
 
 \begin{abstract}
-	ConvPE substantially improves Transformers parameter efficiency and training efficiency by Convolutional Position Embedding. ConvPE achieves substantial reductions in validation loss compared with the Rotary Position Embedding (RoPE) baseline, while adding only a small number of backbone parameters (+0.15\% params, -3.83\% loss; +1.87\% params, -8.03\% loss). As model scale increases, the best configuration achieves a 10.3\% loss reduction with only a 4.34\% increase in backbone parameters, demonstrating high performance and parameter efficiency. ConvPE uses convolution to generate attention score biases, making it compatible with various Transformer architectures and high-dimensional modalities. The code for ConvPE is publicly available at \url{https://github.com/wzhagi/convpe}.
+	ConvPE (Convolutional Positional Encoding) substantially improves both the parameter efficiency and training performance of Transformers. At the cost of only 3.2\% additional parameters and roughly proportional computation, it achieves a 14.6\% reduction in training loss, decreasing from 2.60 to 2.22. ConvPE uses convolution to generate attention score biases, making it compatible with various Transformer architectures and high-dimensional modalities. The code for ConvPE is publicly available at \url{https://github.com/wzhagi/convpe}.
 \end{abstract}
 \keywords{Position Embedding \and Language Models \and Transformers \and Attention}
 
@@ -43,8 +43,8 @@
 
 \begin{wrapfigure}{r}{0.5\textwidth}
     \centering
-    \includegraphics[width=\linewidth]{FIGURES/parameter_efficiency_ranking.png}
-    \caption{Parameter efficiency Top16 of experiments in section \ref{sec:ahe}}
+    \includegraphics[width=\linewidth]{FIGURES/main_figure.png}
+    \caption{Train \& validation loss on WikiText-103 for 10 epochs.\ref{sec:ahe}}
     \label{fig:fig1}
 \end{wrapfigure}
 
