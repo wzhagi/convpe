@@ -1,5 +1,7 @@
 # ConvPE
-ConvPE substantially improves Transformers parameter efficiency and training efficiency by Convolutional Position Embedding. ConvPE achieves substantial reductions in validation loss compared with the Rotary Position Embedding (RoPE) baseline, while adding only a small number of backbone parameters (+0.15% params, -3.83% loss; +1.87% params, -8.03% loss). As model scale increases, the best configuration achieves a 10.3% loss reduction with only a 4.34% increase in backbone parameters, demonstrating high performance and parameter efficiency. ConvPE uses convolution to generate attention score biases, making it compatible with various Transformer architectures and high-dimensional modalities.
+ConvPE 卷积位置编码显著提升了Transformer的参数效率和训练性能。3.2%的额外参数和大致等比例的计算，换取16.3%的训练loss下降，从2.60降到2.22。
+
+ConvPE (convolutional positional encoding) substantially improves both the parameter efficiency and training performance of Transformers. At the cost of only 3.2% additional parameters and roughly proportional computation, it achieves a 16.3% reduction in training loss, decreasing from 2.60 to 2.22.
 
 ![](/paper/FIGURES/attn_score_bias.png)
 ## Training curves on WikiText-103 for 10 epochs
