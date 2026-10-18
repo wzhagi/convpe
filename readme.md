@@ -52,4 +52,4 @@ Sub-folders and files in the "results" folder may cause training to be automatic
 
     python3 trainer_train.py
 
-    python3 cifar_train.py
+    python3 train_cifar.py
