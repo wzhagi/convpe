@@ -1,5 +1,5 @@
 # ConvPE
-ConvPE improves Transformer with 3x parameter efficiency by Convolutional Position Embedding.
+ConvPE substantially improves Transformers parameter efficiency and training efficiency by Convolutional Position Embedding.
 ![](/paper/FIGURES/attn_score_bias.png)
 ## Training curve on WikiText-103 for 10 epochs
 
