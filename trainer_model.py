@@ -28,55 +28,37 @@ class LanguageModel(PreTrainedModel):
             self.rope = RotaryPositionalEmbedding(config.dim_rope, config.max_seq_len)
         else:
             self.rope = None
-
-        self.attns = nn.ModuleList(
-            [
-                MultiQueryAttention(
-                    config.dim_model,
-                    config.num_heads,
-                    config.dim_head,
-                    self.rope,
-                    (
-                        ConvPE(
-                            config.dim_model,
-                            config.num_heads,
-                            config.convpe_window_size,
-                            config.convpe_dim_shared,
-                            config.convpe_dim_headwise,
-                            config.convpe_groups_shared,
-                            config.convpe_groups_headwise,
-                        )
-                        if config.convpe_window_size > 0
-                        else None
-                    ),
-                )
-                for _ in range(config.num_layers)
-            ]
+        self.transformer = CausualTransformer(
+            config.num_layers,
+            config.dim_model,
+            config.num_heads,
+            config.dim_head,
+            config.dim_model * 8 // 3,
+            self.rope,
+            (
+                [
+                    ConvPE(
+                        config.dim_model,
+                        config.num_heads,
+                        config.convpe_window_size,
+                        config.convpe_dim_shared,
+                        config.convpe_dim_headwise,
+                        config.convpe_groups_shared,
+                        config.convpe_groups_headwise,
+                    )
+                    for _ in range(config.num_layers)
+                ]
+                if config.convpe_window_size > 0
+                else None
+            ),
+            config.max_seq_len,
         )
-
-        self.ffns = nn.ModuleList(
-            [
-                GatedFeedForward(
-                    config.dim_model,
-                    (
-                        config.dim_ffn
-                        if hasattr(config, "dim_ffn")
-                        else config.dim_model * 8 // 3
-                    ),
-                )
-                for _ in range(config.num_layers)
-            ]
-        )
-        self.post_norm = nn.LayerNorm(config.dim_model)
         self.lm_head = nn.Linear(config.dim_model, config.vocab_size, bias=False)
         self.post_init()
 
     def forward(self, input_ids, labels=None, **kwargs) -> CausalLMOutputWithPast:
         x = self.tok_emb(input_ids)
-        x = self.post_norm(x)
-        for l in range(len(self.attns)):
-            x = x + self.attns[l](x)
-            x = x + self.ffns[l](x)
+        x = self.transformer(x)
         logits = self.lm_head(x)
         loss = None
         if labels is not None:

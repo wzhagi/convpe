@@ -44,12 +44,13 @@ class CausualTransformer(nn.Module):
                 for _ in range(num_layers)
             ]
         )
+        self.post_norm = nn.RMSNorm(dim_model) if convpe_list is None else None
 
     def forward(self, x: Tensor) -> Tensor:
         for l in range(len(self.attns)):
             x = x + self.attns[l](x)
             x = x + self.ffns[l](x)
-        return x
+        return x if self.post_norm is None else self.post_norm(x)
 
 
 class MultiQueryAttention(nn.Module):
