@@ -11,7 +11,7 @@ ConvPE (Convolutional Position Embedding) substantially improves both the parame
 ## ConvPE2D effectiveness verification in CIFAR-10, CIFAR-100.
 |model|CIFAR-10 val acc|CIFAR-100 val acc|
 |:-:|:-:|:-:|
-|RoPE baseline 5.3M|0.906|0.630|
+|RoPE baseline 5.3M|0.910|0.627|
 |ConvPE 3x3 5.4M|**0.915**|0.647|
 |ConvPE 5x5 5.5M|0.908|**0.648**|
 
