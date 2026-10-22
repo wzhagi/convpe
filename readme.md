@@ -4,6 +4,11 @@ ConvPE 卷积位置编码显著提升了Transformer的参数效率和训练性�
 ConvPE (Convolutional Position Embedding) substantially improves both the parameter efficiency and training performance of Transformers. At the cost of only 3.2% additional parameters and roughly proportional computation, it achieves a 14.6% reduction in training loss, decreasing from 2.60 to 2.22.
 
 ![](/paper/FIGURES/attn_score_bias.png)
+
+## Pretrain curves on the first 3B tokens of FineWeb-Edu-10BT
+
+![](/paper/FIGURES/pretrain.png)
+
 ## Training curves on WikiText-103 for 10 epochs
 
 ![](/paper/FIGURES/main_figure.png)
