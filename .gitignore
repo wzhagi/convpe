@@ -5,3 +5,5 @@ data
 *.pth
 *.bin
 *.safetensors
+results
+results_pretrain
