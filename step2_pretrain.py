@@ -108,6 +108,7 @@ def run_train(config, train_dataset):
         num_train_epochs=1,
         max_steps=1000,
         per_device_train_batch_size=4,
+        dataloader_drop_last=True,
         learning_rate=3e-4,
         lr_scheduler_type="cosine",
         weight_decay=0.01,

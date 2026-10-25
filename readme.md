@@ -85,3 +85,12 @@ run step2_plot.ipynb to see results.
     python3 step3_pretrain_eval.py
 
 run step3_plot.ipynb to see results.
+
+## Tilelang kernels
+
+### 1. Cuda Version
+Make sure your torch cuda version and tilelang cuda version is the same with python venv cuda version or system cuda version
+
+#### Create a new venv and install tilelang requirements
+
+    pip install -r requirements_tilelang.txt

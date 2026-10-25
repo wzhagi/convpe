@@ -1,0 +1,12 @@
+--extra-index-url https://download.pytorch.org/whl/cu132
+torch
+torchvision
+transformers[torch]
+datasets
+lm_eval
+matplotlib
+nvidia-cuda-nvcc==13.2.86
+nvidia-cuda-cccl==13.2.86
+nvidia-nvvm==13.2.86
+nvidia-cuda-crt==13.2.86
+tilelang[nvcc]

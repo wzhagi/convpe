@@ -3,3 +3,4 @@ torchvision
 transformers[torch]
 datasets
 lm_eval
+matplotlib
