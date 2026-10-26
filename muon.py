@@ -26,16 +26,16 @@ class AdamMuon(Optimizer):
     def __init__(
         self,
         named_params,
+        adam_lr=0.001,
+        adam_betas=(0.9, 0.999),
         muon_lr=0.001,
         muon_momentum=0.95,
         muon_weight_decay=0.1,
-        adam_lr=0.001,
-        adam_betas=(0.9, 0.999),
     ):
         named_params = list(named_params)
         super().__init__([p for n, p in named_params], defaults={})
         adam_params, muon_params = route_params(named_params)
-        self.adam = torch.optim.Adam(adam_params, adam_lr, adam_betas,fused=True)
+        self.adam = torch.optim.Adam(adam_params, adam_lr, adam_betas, fused=True)
         self.muon = torch.optim.Muon(
             muon_params, muon_lr, muon_weight_decay, muon_momentum
         )

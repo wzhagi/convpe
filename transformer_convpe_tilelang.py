@@ -4,8 +4,9 @@ from torch.nn import functional as F
 from attn_tilelang import window_score_bias_attention as attention
 
 # from attn_flex import window_score_bias_attention as attention
-# from convpe import ConvPE
-from convpe_full import ConvPE
+from convpe import ConvPE
+
+# from convpe_exp import ConvPE
 
 
 class Transformer(nn.Module):
@@ -101,7 +102,7 @@ class MultiQueryAttention(nn.Module):
         self.rope = rope
         self.dim_head = dim_head
 
-        self.register_parameter("sink", nn.Parameter(torch.ones(num_heads) * -1e4))
+        self.register_parameter("sink", nn.Parameter(torch.zeros(num_heads)))
         self.pre_norm = nn.RMSNorm(dim_model)
         self.wq = nn.Linear(dim_model, num_heads * dim_head, bias=False)
         self.wkv = nn.Linear(dim_model, dim_head, False)
