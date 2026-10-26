@@ -46,7 +46,9 @@ class LanguageModel(PreTrainedModel):
         self.lm_head = nn.Linear(config.dim_model, config.vocab_size, bias=False)
         self.post_init()
 
-    def forward(self, input_ids, labels=None, **kwargs) -> CausalLMOutputWithPast:
+    def forward(
+        self, input_ids, labels=None, attention_mask=None
+    ) -> CausalLMOutputWithPast:
         x = self.tok_emb(input_ids)
         x = self.transformer(x)
         logits = self.lm_head(x)
