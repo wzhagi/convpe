@@ -39,7 +39,6 @@ class AdamMuon(Optimizer):
         self.muon = torch.optim.Muon(
             muon_params, muon_lr, muon_weight_decay, muon_momentum
         )
-
         self.param_groups = self.adam.param_groups + self.muon.param_groups
 
     def step(self, closure=None):
@@ -56,3 +55,5 @@ class AdamMuon(Optimizer):
     def load_state_dict(self, state_dict):
         self.adam.load_state_dict(state_dict["adam"])
         self.muon.load_state_dict(state_dict["muon"])
+        self.param_groups = self.adam.param_groups + self.muon.param_groups
+
