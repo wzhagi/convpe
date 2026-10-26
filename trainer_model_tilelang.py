@@ -52,7 +52,6 @@ class LanguageModel(PreTrainedModel):
         x = self.tok_emb(input_ids)
         x = self.transformer(x)
         logits = self.lm_head(x)
-        logits = 30 * torch.tanh(logits / 30)
         loss = None
         if labels is not None:
             loss = F.cross_entropy(

@@ -110,12 +110,11 @@ class MultiQueryAttention(nn.Module):
         self.wo = nn.Linear(num_heads * dim_head, dim_model)
 
     def forward(self, x: Tensor) -> Tensor:
-        # x: (b,s,d) q: (b,h,s,d) kv:(b,1,s,d) o:(b,h,s,d)
+        # x: (b,s,d) q: (b,s,h,d) kv:(b,s,1,d) o:(b,s,h,d)
         x = self.pre_norm(x)
         q = self.wq(x).unflatten(-1, (self.num_heads, -1))
         q = F.normalize(q, dim=-1)
-        kv = self.wkv(x).unsqueeze(-2)
-        kv = self.kv_norm(kv)
+        kv = self.kv_norm(self.wkv(x)).unsqueeze(-2)
         if self.rope is not None:
             q = self.rope(q)
             kv = self.rope(kv)
@@ -144,7 +143,7 @@ class RotaryPositionalEmbedding(nn.Module):
 
     def forward(self, x: Tensor, pos: int = 0, inverse: bool = False) -> Tensor:
         """
-        x: (..., s, d)
+        x: (...,s, h, d)
         pos: start position
         inverse: inverse rotation
         """
@@ -171,18 +170,16 @@ class RotaryPositionalEmbedding(nn.Module):
         )
         seq_idx = torch.arange(pos, pos + seq_len, device=device, dtype=dtype)
         idx_theta = torch.outer(seq_idx, theta)
-        cos = torch.cos(idx_theta)
-        sin = torch.sin(idx_theta)
-        return cos, sin
+        cos = torch.cos(idx_theta).unsqueeze(-2)
+        sin = torch.sin(idx_theta).unsqueeze(-2)
+        return cos, sin #(s, 1, d)
 
     def apply_rope(self, x: Tensor, cos, sin, inverse=False):
-        dtype = x.dtype
+        dtype = x.dtype #(...,s, h, d)
         x_rope = x[..., : self.dim_rope].to(torch.float32)
         x_rope_pairs = x_rope.unflatten(-1, (-1, 2))
-        x0 = x_rope_pairs[..., 0]
-        x1 = x_rope_pairs[..., 1]
-        cos = cos.unsqueeze(0).unsqueeze(-2)
-        sin = sin.unsqueeze(0).unsqueeze(-2)
+        x0 = x_rope_pairs[..., 0] #(...,s, h, d)
+        x1 = x_rope_pairs[..., 1] #(...,s, h, d)
         if inverse:
             out0 = x0 * cos + x1 * sin
             out1 = x1 * cos - x0 * sin
