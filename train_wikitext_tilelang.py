@@ -98,19 +98,14 @@ def main(cfg: dict | None = None):
     def convpe_config(prototype, name:str):
         config = copy.deepcopy(prototype)
         config.name = f"{config.name}_{name}"
-        m = re.fullmatch(r"w(\d+)d(\d+)r(\d+)h(\d+)g(\d+)", name)
-        if m is None:
-            raise ValueError(
-                f"Invalid convpe config name: {name!r}, "
-                f"expected format like 'w128d4'"
-            )
-        w, d, r, h, g = map(int, m.groups())
-        config.convpe_win = w
-        config.convpe_dim = d
-        config.convpe_heads = h
-        config.convpe_rank = r
-        config.convpe_groups = g
-        config.convpe_share = name.endswith('s')
+        m = re.fullmatch(r"w(\d+)d(\d+)r(\d+)h(\d+)g(\d+)(s)?", name)
+        w, d, r, h, g, s = m.groups()
+        config.convpe_win = int(w)
+        config.convpe_dim = int(d)
+        config.convpe_rank = int(r)
+        config.convpe_heads = int(h)
+        config.convpe_groups = int(g)
+        config.convpe_share = s is not None
         return config
 
     # configs.append(tiny_rope)
@@ -123,14 +118,16 @@ def main(cfg: dict | None = None):
     # configs.append(convpe_config(tiny_nope, "w128d6r128h3g1"))
     # configs.append(convpe_config(tiny_rope, "w128d6r128h3g1"))
 
-    # configs.append(base_rope)  # 10.9it/s 3.8055
-    # configs.append(convpe_config(base_nope, "w128d4r0h1g1")) #10.5it/s
-    configs.append(convpe_config(base_nope, "w128d4r128h4g1")) # 10.4it/s
-    # configs.append(convpe_config(base_nope, "w128d16r0h1g1")) # 10.3it/s
-    # configs.append(convpe_config(base_nope, "w128d16r128h4g1")) # 10.2it/s
+    # configs.append(base_rope)  # 11it/s
 
-    # configs.append(convpe_config(base_nope, "w128d16r128h12g4")) # 9.8it/s
-    # configs.append(convpe_config(base_nope, "w128d16r128h12g1")) # 9.9it/s
+    # configs.append(convpe_config(base_nope, "w128d4r0h1g1")) #10.6it/s
+    # configs.append(convpe_config(base_nope, "w128d8r0h1g1")) #10.5it/s
+    # configs.append(convpe_config(base_nope, "w128d16r0h1g1")) #10.4it/s
+    configs.append(convpe_config(base_nope, "w128d4r0h4g1s")) #10.4it/s
+
+    # configs.append(convpe_config(base_nope, "w128d4r128h4g1"))
+    # configs.append(convpe_config(base_nope, "w128d8r128h4g1"))
+    # configs.append(convpe_config(base_nope, "w128d16r0h4g4s"))
 
 
     print("========== configs to be trained ==========")
