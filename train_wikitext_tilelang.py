@@ -123,7 +123,7 @@ def main(cfg: dict | None = None):
     # configs.append(convpe_config(base_nope, "w128d4r0h1g1")) #10.6it/s
     # configs.append(convpe_config(base_nope, "w128d8r0h1g1")) #10.5it/s
     # configs.append(convpe_config(base_nope, "w128d16r0h1g1")) #10.4it/s
-    configs.append(convpe_config(base_nope, "w128d4r0h4g1s")) #10.4it/s
+    configs.append(convpe_config(base_nope, "w128d4r0h4g1")) #10.4it/s
 
     # configs.append(convpe_config(base_nope, "w128d4r128h4g1"))
     # configs.append(convpe_config(base_nope, "w128d8r128h4g1"))
