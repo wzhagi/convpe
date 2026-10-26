@@ -1,12 +1,10 @@
 import torch
 from torch import Tensor, nn
 from torch.nn import functional as F
+from convpe import ConvPE
 from attn_tilelang import window_score_bias_attention as attention
 
 # from attn_flex import window_score_bias_attention as attention
-from convpe import ConvPE
-
-# from convpe_exp import ConvPE
 
 
 class Transformer(nn.Module):
@@ -172,14 +170,14 @@ class RotaryPositionalEmbedding(nn.Module):
         idx_theta = torch.outer(seq_idx, theta)
         cos = torch.cos(idx_theta).unsqueeze(-2)
         sin = torch.sin(idx_theta).unsqueeze(-2)
-        return cos, sin #(s, 1, d)
+        return cos, sin  # (s, 1, d)
 
     def apply_rope(self, x: Tensor, cos, sin, inverse=False):
-        dtype = x.dtype #(...,s, h, d)
+        dtype = x.dtype  # (...,s, h, d)
         x_rope = x[..., : self.dim_rope].to(torch.float32)
         x_rope_pairs = x_rope.unflatten(-1, (-1, 2))
-        x0 = x_rope_pairs[..., 0] #(...,s, h, d)
-        x1 = x_rope_pairs[..., 1] #(...,s, h, d)
+        x0 = x_rope_pairs[..., 0]  # (...,s, h, d)
+        x1 = x_rope_pairs[..., 1]  # (...,s, h, d)
         if inverse:
             out0 = x0 * cos + x1 * sin
             out1 = x1 * cos - x0 * sin
