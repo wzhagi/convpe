@@ -127,7 +127,7 @@ def run_train(config, train_dataset):
         max_grad_norm=5.0,
         logging_steps=100,
         save_steps=2000,
-        save_total_limit=1,
+        save_total_limit=2,
         report_to="none",
         dataloader_drop_last=True,
         dataloader_num_workers=0,
@@ -147,7 +147,7 @@ def run_train(config, train_dataset):
         data_collator=data_collator,
         processing_class=tokenizer,
         optimizers=(
-            AdamMuon(model.named_parameters(), muon_lr=6e-3, adam_lr=6e-4),
+            AdamMuon(model.named_parameters(), muon_lr=3e-3, adam_lr=3e-4),
             None,
         ),
     )
