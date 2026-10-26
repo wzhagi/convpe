@@ -59,13 +59,13 @@ def main():
 
     configs = []
 
-    configs.append(base_rope)  # 2.7it/s 18.8h
+    # configs.append(base_rope)  # 2.75it/s 18.5h
     # params: 768*((128*25+768*8)*12+50257)=124.7M
 
     # configs.append(convpe_config(base_nope, "w128d4r0h1g1")) #2.60it/s
     # params: 768*((128*25+768*8)*12+50257) + (768*4+4*128*128)*12 = 125.5M
 
-    configs.append(convpe_config(base_nope, "w128d16r0h1g1"))  # 2.55it/s 20h
+    configs.append(convpe_config(base_nope, "w128d16r0h1g1"))  # 2.62it/s 20h
     # params: 768*((128*25+768*8)*12+50257) + (768*16+16*128*128)*12 = 128.0M
 
     # ============ Dataset ============
@@ -119,11 +119,11 @@ def run_train(config, train_dataset):
         max_steps=-1,
         lr_scheduler_type="cosine",
         # lr_scheduler_type="warmup_stable_decay",
-        warmup_steps=500,
         # lr_scheduler_kwargs={
         #     "num_decay_steps": 40000,
         #     "decay_type": "linear",
         # },
+        warmup_steps=500,
         max_grad_norm=5.0,
         logging_steps=100,
         save_steps=2000,
