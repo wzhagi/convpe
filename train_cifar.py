@@ -2,7 +2,7 @@ import torch, time, os
 from torch import nn, Tensor
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
-from transformer_convpe import *
+from convpe2d import *
 
 print(torch.__version__)
 device = "cuda"
@@ -48,7 +48,9 @@ class ViT_ConvPE(nn.Module):
         out_features,
         patch_shape,
         max_seq_len,
-        window_size,
+        convpe_win,
+        convpe_dim,
+        convpe_heads,
     ):
         super().__init__()
         self.emb = nn.Conv2d(3, dim_model, patch_shape, patch_shape)
@@ -56,10 +58,9 @@ class ViT_ConvPE(nn.Module):
             num_layers,
             dim_model,
             num_heads,
-            convpe_list=[
-                ConvPE2D(dim_model, num_heads, 8, 8, window_size)
-                for _ in range(num_layers)
-            ],
+            convpe_win=convpe_win,
+            convpe_dim=convpe_dim,
+            convpe_heads=convpe_heads,
             max_seq_len=max_seq_len,
         )
         self.cls = nn.Linear(dim_model, out_features)
@@ -68,7 +69,7 @@ class ViT_ConvPE(nn.Module):
         if not self.training:
             x = torch.cat((x, torch.flip(x, (-1,))))
         x = self.emb.forward(x).flatten(2).mT.contiguous()
-        x = self.model(x)
+        x = self.model(x, 8, 8)
         x = self.cls(x)
         x = x.mean(-2)
         if not self.training:
@@ -84,12 +85,79 @@ class ViT_Tiny(ViT):
 
 class ViT_Tiny_ConvPEw3(ViT_ConvPE):
     def __init__(self, out_features, patch_shape, max_seq_len, **kwargs):
-        super().__init__(192, 3, 12, out_features, patch_shape, max_seq_len, 3)
+        super().__init__(192, 3, 12, out_features, patch_shape, max_seq_len, 3, 4, 1)
 
 
 class ViT_Tiny_ConvPEw5(ViT_ConvPE):
     def __init__(self, out_features, patch_shape, max_seq_len, **kwargs):
-        super().__init__(192, 3, 12, out_features, patch_shape, max_seq_len, 5)
+        super().__init__(192, 3, 12, out_features, patch_shape, max_seq_len, 5, 16, 1)
+
+
+class Conv2d(nn.Module):
+    def __init__(self, channels_in, channels_out, kernel_size, padding, stride, bias):
+        super().__init__()
+        self.in_channels = channels_in
+        self.out_channels = channels_out
+        self.kernel_size = kernel_size
+        self.padding = padding
+        self.stride = stride
+        self.linear = nn.Linear(
+            channels_in * kernel_size * kernel_size, channels_out, bias=bias
+        )
+
+    def forward(self, x):
+        w = self.linear.weight.view(
+            self.out_channels, self.in_channels, self.kernel_size, self.kernel_size
+        )
+        return F.conv2d(
+            x,
+            w,
+            self.linear.bias,
+            stride=self.stride,
+            padding=self.padding,
+        )
+
+
+class ConvGroup(nn.Sequential):
+    def __init__(self, channels_in, channels_out):
+        super().__init__(
+            Conv2d(channels_in, channels_out, 3, 1, 1, False),
+            nn.MaxPool2d(2),
+            nn.BatchNorm2d(channels_out),
+            nn.GELU(),
+            Conv2d(channels_out, channels_out, 3, 1, 1, False),
+            nn.BatchNorm2d(channels_out),
+            nn.GELU(),
+        )
+
+
+class ConvNet(nn.Module):
+    def __init__(self, out_features, **kwargs):
+        super().__init__()
+        self.channels = [3, 24, 64, 256, 512]
+        self.pad = nn.ReflectionPad2d(2)
+        self.emb = nn.Conv2d(3, 24, 2, bias=False)
+        self.net = nn.Sequential(
+            nn.GELU(),
+            ConvGroup(24, self.channels[2]),
+            ConvGroup(self.channels[2], self.channels[3]),
+            ConvGroup(self.channels[3], self.channels[4]),
+            nn.AdaptiveMaxPool2d((1, 1)),
+            nn.Flatten(),
+        )
+        self.cls = nn.Linear(self.channels[4], out_features)
+
+    def forward(self, x):
+        if not self.training:
+            x = torch.cat((x, torch.flip(x, (-1,))))
+        x = self.pad(x)
+        x = self.emb(x)
+        x = self.net(x)
+        x = self.cls(x)
+        if not self.training:
+            orig, flipped = x.split(x.shape[0] // 2, dim=0)
+            x = 0.5 * orig + 0.5 * flipped
+        return x
 
 
 def cifar10():
@@ -304,13 +372,14 @@ if __name__ == "__main__":
     configs = []
     for seed in range(1):
         for dataset in [
-            cifar10,
+            # cifar10,
             cifar100,
         ]:
             for model in [
                 ViT_Tiny,
-                ViT_Tiny_ConvPEw3,
+                # ViT_Tiny_ConvPEw3,
                 ViT_Tiny_ConvPEw5,
+                # ConvNet
             ]:
                 configs.append(
                     {

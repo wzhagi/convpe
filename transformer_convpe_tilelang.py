@@ -1,9 +1,8 @@
 import torch
 from torch import Tensor, nn
 from torch.nn import functional as F
-from convpe import ConvPE
+from convpe_exp import ConvPE
 from attn_tilelang import window_score_bias_attention as attention
-
 # from attn_flex import window_score_bias_attention as attention
 
 

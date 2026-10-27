@@ -26,11 +26,11 @@ class AdamMuon(Optimizer):
     def __init__(
         self,
         named_params,
-        adam_lr=0.001,
+        adam_lr=3e-4,
         adam_betas=(0.9, 0.999),
-        muon_lr=0.001,
+        muon_lr=3e-3,
         muon_momentum=0.95,
-        muon_weight_decay=0.1,
+        muon_weight_decay=0.01,
     ):
         named_params = list(named_params)
         super().__init__([p for n, p in named_params], defaults={})

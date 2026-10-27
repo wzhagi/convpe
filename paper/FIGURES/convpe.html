@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ConvPE (simplified)</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 50px 160px 50px 120px;
+    background: #ffffff;
+    display: flex;
+    justify-content: center;
+    font-family: "Latin Modern Roman", "Computer Modern", "Times New Roman", serif;
+    color: #000;
+  }
+  .diagram {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .text-line {
+    font-size: 17px;
+    padding: 6px 0;
+    white-space: nowrap;
+  }
+  .box {
+    border: 1.2px solid #000;
+    border-radius: 4px;
+    padding: 7px 24px;
+    font-size: 15px;
+    background: #fff;
+    white-space: nowrap;
+  }
+  .box.wide {
+    padding: 7px 20px;
+  }
+  .arrow-wrap {
+    position: relative;
+    display: inline-block;
+  }
+  .arrow-label {
+    position: absolute;
+    left: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    margin-left: 8px;
+    white-space: nowrap;
+    font-size: 13px;
+  }
+  sup, sub {
+    font-size: 0.7em;
+    line-height: 0;
+  }
+  .hidden-defs {
+    position: absolute;
+    width: 0;
+    height: 0;
+    overflow: hidden;
+  }
+</style>
+</head>
+<body>
+
+<!-- 全局箭头 marker 定义 -->
+<svg class="hidden-defs" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,1 L9,5 L0,9 z" fill="#000"/>
+    </marker>
+  </defs>
+</svg>
+
+<div class="diagram">
+
+  <!-- x（无框） -->
+  <div class="text-line">X ∈ ℝ<sup>B×S×D</sup></div>
+
+  <!-- 短箭头：x → proj，无标签 -->
+  <svg width="14" height="22" xmlns="http://www.w3.org/2000/svg">
+    <line x1="7" y1="0" x2="7" y2="22" stroke="#000" stroke-width="1.2" marker-end="url(#arr)"/>
+  </svg>
+
+  <!-- proj -->
+  <div class="box">Linear Projection &nbsp; D → C</div>
+
+  <!-- 中箭头：proj → conv，侧面标 x_down -->
+  <div class="arrow-wrap">
+    <svg width="14" height="42" xmlns="http://www.w3.org/2000/svg">
+      <line x1="7" y1="0" x2="7" y2="42" stroke="#000" stroke-width="1.2" marker-end="url(#arr)"/>
+    </svg>
+    <span class="arrow-label">X<sub>down</sub>∈ ℝ<sup>B×S×C</sup></span>
+  </div>
+
+  <!-- conv -->
+  <div class="box wide">
+    Causal Conv1d (C, H<sub>b</sub>×W, W, pad=(W−1, 0))
+  </div>
+
+  <!-- 中箭头：conv → score bias，侧面标 o -->
+  <div class="arrow-wrap">
+    <svg width="14" height="42" xmlns="http://www.w3.org/2000/svg">
+      <line x1="7" y1="0" x2="7" y2="42" stroke="#000" stroke-width="1.2" marker-end="url(#arr)"/>
+    </svg>
+    <span class="arrow-label">O ∈ ℝ<sup>B×S×(H<sub>b</sub>×W)</sup></span>
+  </div>
+
+  <!-- score bias（无框） -->
+  <div class="text-line">B<sub>ConvPE</sub>∈ ℝ<sup>B×S×H<sub>b</sub>×W</sup></div>
+
+</div>
+
+</body>
+</html>

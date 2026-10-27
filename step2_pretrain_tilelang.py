@@ -59,12 +59,8 @@ def main():
 
     configs = []
 
-    # configs.append(base_rope)  # 2.75it/s 18.5h
+    configs.append(base_rope)  # 2.75it/s 18.5h
     # params: 768*((128*25+768*8)*12+50257)=124.7M
-
-    # configs.append(convpe_config(base_nope, "w128d4r0h1g1")) #2.60it/s
-    # params: 768*((128*25+768*8)*12+50257) + (768*4+4*128*128)*12 = 125.5M
-
     configs.append(convpe_config(base_nope, "w128d16r0h1g1"))  # 2.62it/s 20h
     # params: 768*((128*25+768*8)*12+50257) + (768*16+16*128*128)*12 = 128.0M
 
@@ -124,7 +120,7 @@ def run_train(config, train_dataset):
         #     "decay_type": "linear",
         # },
         warmup_steps=500,
-        max_grad_norm=5.0,
+        max_grad_norm=4.0,
         logging_steps=100,
         save_steps=2000,
         save_total_limit=2,
@@ -146,10 +142,7 @@ def run_train(config, train_dataset):
         train_dataset=train_dataset,
         data_collator=data_collator,
         processing_class=tokenizer,
-        optimizers=(
-            AdamMuon(model.named_parameters(), muon_lr=3e-3, adam_lr=3e-4),
-            None,
-        ),
+        optimizers=(AdamMuon(model.named_parameters()), None),
     )
 
     trainer.train(resume_from_checkpoint=get_latest_checkpoint(output_dir))
