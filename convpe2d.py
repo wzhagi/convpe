@@ -11,12 +11,12 @@ class ConvPE2D(nn.Module):
         self.window_size = window_size
         self.num_bias_heads = bias_heads
         self.proj = nn.Linear(dim_model, dim_convpe, bias=False)
-        self.conv = nn.Conv2d(
+        self.conv = Conv2d(
             dim_convpe,
             bias_heads * window_size**2,
             window_size,
-            stride=1,
             padding=window_size // 2,
+            stride=1,
         )
 
     def forward(self, x: Tensor, H: int, W: int) -> Tensor:
@@ -24,6 +24,24 @@ class ConvPE2D(nn.Module):
         hb, w = self.num_bias_heads, self.window_size
         x = self.proj(x).mT.unflatten(-1, (H, W))
         return self.conv(x).reshape(b, hb, w, w, H, W)
+
+
+class Conv2d(nn.Module):
+    def __init__(
+        self, channels_in, channels_out, kernel_size, padding, stride, bias=True
+    ):
+        super().__init__()
+        self.kernel_size = kernel_size
+        self.padding = padding
+        self.stride = stride
+        self.linear = nn.Linear(
+            channels_in * kernel_size * kernel_size, channels_out, bias=bias
+        )
+
+    def forward(self, x):
+        w = self.kernel_size
+        weight = self.linear.weight.view(self.linear.out_features, -1, w, w)
+        return F.conv2d(x, weight, self.linear.bias, self.stride, self.padding)
 
 
 class VisionTransformer(nn.Module):

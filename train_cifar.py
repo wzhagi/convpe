@@ -83,39 +83,19 @@ class ViT_Tiny(ViT):
         super().__init__(192, 3, 12, out_features, patch_shape, max_seq_len)
 
 
-class ViT_Tiny_ConvPEw3(ViT_ConvPE):
+class ViT_Tiny_ConvPEw3d4(ViT_ConvPE):
     def __init__(self, out_features, patch_shape, max_seq_len, **kwargs):
         super().__init__(192, 3, 12, out_features, patch_shape, max_seq_len, 3, 4, 1)
 
 
-class ViT_Tiny_ConvPEw5(ViT_ConvPE):
+class ViT_Tiny_ConvPEw3d8(ViT_ConvPE):
     def __init__(self, out_features, patch_shape, max_seq_len, **kwargs):
-        super().__init__(192, 3, 12, out_features, patch_shape, max_seq_len, 5, 16, 1)
+        super().__init__(192, 3, 12, out_features, patch_shape, max_seq_len, 3, 8, 1)
 
 
-class Conv2d(nn.Module):
-    def __init__(self, channels_in, channels_out, kernel_size, padding, stride, bias):
-        super().__init__()
-        self.in_channels = channels_in
-        self.out_channels = channels_out
-        self.kernel_size = kernel_size
-        self.padding = padding
-        self.stride = stride
-        self.linear = nn.Linear(
-            channels_in * kernel_size * kernel_size, channels_out, bias=bias
-        )
-
-    def forward(self, x):
-        w = self.linear.weight.view(
-            self.out_channels, self.in_channels, self.kernel_size, self.kernel_size
-        )
-        return F.conv2d(
-            x,
-            w,
-            self.linear.bias,
-            stride=self.stride,
-            padding=self.padding,
-        )
+class ViT_Tiny_ConvPEw5d4(ViT_ConvPE):
+    def __init__(self, out_features, patch_shape, max_seq_len, **kwargs):
+        super().__init__(192, 3, 12, out_features, patch_shape, max_seq_len, 5, 4, 1)
 
 
 class ConvGroup(nn.Sequential):
@@ -245,7 +225,7 @@ def adam_parameters(model):
 
 def train(epochs, batch_size, learn_rate, model, seed, dataset, config, **kwargs):
     torch.manual_seed(seed)
-    log_path = f"./results/{dataset.__name__}_{model.__name__}_muon/{seed}.csv"
+    log_path = f"./results/{dataset.__name__}_{model.__name__}_muon_{seed}.csv"
     dataset = dataset()
     model = model(
         out_features=dataset["num_class"], patch_shape=(4, 4), max_seq_len=64, **config
@@ -372,13 +352,14 @@ if __name__ == "__main__":
     configs = []
     for seed in range(1):
         for dataset in [
-            # cifar10,
+            cifar10,
             cifar100,
         ]:
             for model in [
                 ViT_Tiny,
-                # ViT_Tiny_ConvPEw3,
-                ViT_Tiny_ConvPEw5,
+                ViT_Tiny_ConvPEw3d4,
+                # ViT_Tiny_ConvPEw5d4,
+                # ViT_Tiny_ConvPEw3d8,
                 # ConvNet
             ]:
                 configs.append(

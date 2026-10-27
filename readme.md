@@ -36,8 +36,9 @@ ConvPE (Convolutional Position Embedding) substantially improves both the parame
 |model|CIFAR-10 val acc|CIFAR-100 val acc|
 |:-:|:-:|:-:|
 |RoPE baseline 5.346M|0.910|0.627|
-|ConvPE2D w3d4 5.359M|**0.931**|0.660|
-|ConvPE2D w5d16 5.503M| 0.928 |**0.669**|
+|ConvPE2D w3d4 5.359M|0.931|**0.695**|
+|ConvPE2D w3d8 5.372M|**0.933**|0.683|
+|ConvPE2D w5d4 5.402M|0.929|0.682|
 |ConvNet 4.335M | 0.945 | 0.737 |
 ## Requirements
     apt install python3-dev
