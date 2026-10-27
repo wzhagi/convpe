@@ -28,12 +28,9 @@ ConvPE (Convolutional Position Embedding) substantially improves both the parame
 | boolq | acc | 0.5994 |**0.6006(+0.0012)** |0.5|
 | truthfulqa_mc1 | acc | 0.2485 | 0.2338(-0.0147) |**0.25**|
 
-## Training curves on WikiText-103 for 10 epochs
 
-![](/paper/FIGURES/main_figure.png)
-
-## ConvPE2D effectiveness verification in CIFAR-10, CIFAR-100.
-|model|CIFAR-10 val acc|CIFAR-100 val acc|
+## ConvPE2D validation accuracy on CIFAR-10, CIFAR-100.
+|model|CIFAR-10 valid acc|CIFAR-100 valid acc|
 |:-:|:-:|:-:|
 |RoPE baseline 5.346M|0.910|0.627|
 |ConvPE2D w3d4 5.359M|0.931|**0.695**|
