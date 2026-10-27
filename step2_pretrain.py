@@ -64,6 +64,9 @@ def main():
     configs.append(convpe_config(base_nope, "w128d16r0h1g1"))  # 2.62it/s 20h
     # params: 768*((128*25+768*8)*12+50257) + (768*16+16*128*128)*12 = 128.0M
 
+    print("========== configs to be trained ==========")
+    for config in configs:
+        print(config.name)
     # ============ Dataset ============
     bin_path = "data/fineweb-4parquet.bin"
     total_blocks = len(np.memmap(bin_path, dtype=np.uint16, mode="r")) // max_seq_len

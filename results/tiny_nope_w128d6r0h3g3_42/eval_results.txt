@@ -1,0 +1,1 @@
+[WikiText-2] loss=4.0479 ppl=57.28 blocks=279

@@ -36,7 +36,7 @@
 \begin{abstract}
 	ConvPE (Convolutional Position Embedding) substantially improves both the parameter efficiency and training performance of Transformers. At the cost of only 3.2\% additional parameters and roughly proportional computation, it achieves a 14.6\% reduction in training loss, decreasing from 2.60 to 2.22. ConvPE uses convolution to generate attention score biases, making it compatible with various Transformer architectures and high-dimensional modalities. The code for ConvPE is publicly available at \url{https://github.com/wzhagi/convpe}.
 \end{abstract}
-\keywords{Position Embedding \and Language Models \and Transformers \and Attention}
+\keywords{Position Embedding \and Language Models \and Transformers \and Attention \and Vision Transformers}
 
 
 \section{Introduction}
@@ -194,9 +194,7 @@ To produce 2D positional embeddings, we use 2D convolutional layers that take
 a 2D window input and produce a 2D window output. We use ViT-Tiny~\cite{dosovitskiy2021image} models with Multi-Head Attention (MHA) and the configuration
 $N_{\mathrm{layers}}=12$, $D_{\mathrm{model}}=192$, $N_{\mathrm{heads}}=3$, and $D_{\mathrm{head}}=64$. We train the models on CIFAR-10 and CIFAR-100~\cite{krizhevsky2009learning} for 100 epochs with patch shape $4\times4$.
 
-Table~\ref{tab:cifar} shows that ConvPE transfers effectively to vision
-transformers and outperforms the RoPE baseline. The influence of
-hyperparameters requires further study on larger models and datasets.
+Table~\ref{tab:cifar} shows that ConvPE transfers effectively to vision transformers and outperforms the RoPE baseline. The influence of hyperparameters requires further study on larger models and datasets.
 
 \begin{table}[!ht]
     \centering
@@ -221,14 +219,7 @@ hyperparameters requires further study on larger models and datasets.
 
 \subsection{Kernel Optimization}
 
-We develop high-performance Flash MQA kernels implemented in TileLang.
-We benchmark base-model configurations \texttt{base rope} with $124.84$M
-parameters and \texttt{base w128d16} with $128.13$M parameters
-($+2.64\%$) using batch size $4$ and sequence length $1024$. The
-forward-pass time increases by $2.70\%$, slightly higher than the
-parameter-count increase. The training time increases by about $7\%$, while
-convergence, measured by the reduction in training loss, is accelerated by
-about $1.8\times$.
+We develop high-performance Flash MQA kernels implemented in TileLang. We benchmark base-model configurations \texttt{base rope} with $124.84$M parameters and \texttt{base w128d16} with $128.13$M parameters ($+2.64\%$) using batch size $4$ and sequence length $1024$. The forward-pass time increases by $2.70\%$, slightly higher than the parameter-count increase. The training time increases by about $7\%$, while convergence, measured by the reduction in training loss, is accelerated by about $1.8\times$.
 
 \section{Conclusions and Future Work}
 
@@ -236,16 +227,12 @@ ConvPE delivers substantial performance gains at a minor parameter and computati
 
 Future work can explore the following directions:
 \begin{itemize}
-    \item \textbf{Kernel Optimization.} Further optimize the backward kernel and     develop additional kernels for a wider range of hardware.
-    \item \textbf{Scaling behavior.} Investigate ConvPE with larger
-    Transformers and datasets, and identify configuration patterns at scale.
-    \item \textbf{Long-context modeling.} Evaluate ConvPE in long-context
-    settings, where positional generalization is particularly important.
-    \item \textbf{Architectural integration.} Combine ConvPE with Sliding
-    Window Attention (SWA)~\cite{beltagy2020longformer}, Compressed Sparse
+    \item \textbf{Kernel Optimization.} Further optimize the backward kernel and develop additional kernels for a wider range of hardware.
+    \item \textbf{Scaling behavior.} Investigate ConvPE with larger Transformers and datasets, and identify configuration patterns at scale.
+    \item \textbf{Long-context modeling.} Evaluate ConvPE in long-context settings, where positional generalization is particularly important.
+    \item \textbf{Architectural integration.} Combine ConvPE with Sliding Window Attention (SWA)~\cite{beltagy2020longformer}, Compressed Sparse
     Attention (CSA)~\cite{deepseek2026v4}, and other Transformer variants.
-    \item \textbf{Multidimensional modalities.} Extend ConvPE to
-    high-dimensional modalities such as vision, speech, and multimodal data.
+    \item \textbf{Multidimensional modalities.} Extend ConvPE to high-dimensional modalities such as vision, speech, and multimodal data.
 \end{itemize}
 
 
