@@ -2,7 +2,7 @@ import os, copy, re, argparse
 
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 import torch
-from trainer_model_tilelang import LanguageModel, LanguageModelConfig
+from trainer_model import LanguageModel, LanguageModelConfig
 
 torch.backends.cudnn.benchmark = True
 VOCAB_SIZE = 50304  # pad 50257 to 50304
@@ -145,9 +145,11 @@ def main():
         print(f"{'name':<28}{'params(M)':>12}{'ms/it':>10}{'it/s':>10}{'tok/s':>14}")
         print("-" * 78)
         for r in results:
-            print(f"{r['name']:<28}{r['params_M']:>12.2f}"
-                  f"{r['ms']:>10.2f}{r['it_s']:>10.2f}"
-                  f"{r['tok_s']:>14.1f}")
+            print(
+                f"{r['name']:<28}{r['params_M']:>12.2f}"
+                f"{r['ms']:>10.2f}{r['it_s']:>10.2f}"
+                f"{r['tok_s']:>14.1f}"
+            )
         print("=" * 78)
 
         # 以第一个为 baseline 的相对参数量 / 相对时间
@@ -157,9 +159,11 @@ def main():
             for r in results[1:]:
                 d_params = (r["params_M"] - base["params_M"]) / base["params_M"] * 100.0
                 d_time = (r["ms"] - base["ms"]) / base["ms"] * 100.0
-                print(f"  {r['name']:<28} "
-                      f"Δparams {d_params:+.2f}%   "
-                      f"Δtime {d_time:+.2f}%")
+                print(
+                    f"  {r['name']:<28} "
+                    f"Δparams {d_params:+.2f}%   "
+                    f"Δtime {d_time:+.2f}%"
+                )
 
 
 if __name__ == "__main__":

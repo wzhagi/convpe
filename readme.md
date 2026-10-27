@@ -41,18 +41,29 @@ ConvPE (Convolutional Position Embedding) substantially improves both the parame
 |ConvPE2D w5d4 5.402M|0.929|0.682|
 |ConvNet 4.335M | 0.945 | 0.737 |
 ## Requirements
+
+### Pytorch Flex kernels
     apt install python3-dev
     pip install -r requirements.txt
 
-## Demo Training
+Edit transformer_convpe.py and use
 
-#### Delete the "results" folder or its sub-folders. (Optional)
+    from attn_flex import convpe_attention as attention
 
-Sub-folders and files in the "results" folder may cause training to be automatically skipped.
+### Tilelang kernels (Alternative)
+Make sure your torch cuda version and tilelang cuda version is the same with python venv cuda version or system cuda version
 
-#### Start training    
+    pip install -r requirements_tilelang.txt
+
+Edit transformer_convpe.py and use
+
+    from attn_tilelang import convpe_attention as attention
+
+## Demo Training  
 
     python3 train_wikitext.py
+
+Run train_wikitext_plot.ipynb to see results.
 
     python3 train_cifar.py
 
@@ -75,24 +86,15 @@ https://www.modelscope.cn/datasets/AI-ModelScope/fineweb-edu/tree/master/sample/
 
 #### Train full dataset (Optional)
 
-set step2_pretrain.py TrainingArguments max_steps=1000 to -1
+    set step2_pretrain.py TrainingArguments max_steps=1000 to -1
 
 #### Start training
     python3 step2_pretrain.py
 
-run step2_plot.ipynb to see results.
+Run step2_plot.ipynb to see results.
 
 ### 3. Pre-training evaluation
 
     python3 step3_pretrain_eval.py
 
-run step3_plot.ipynb to see results.
-
-## Tilelang kernels
-
-### 1. Cuda Version
-Make sure your torch cuda version and tilelang cuda version is the same with python venv cuda version or system cuda version
-
-#### Create a new venv and install tilelang requirements
-
-    pip install -r requirements_tilelang.txt
+Run step3_plot.ipynb to see results.

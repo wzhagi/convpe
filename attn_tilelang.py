@@ -8,7 +8,7 @@ dtype = torch.bfloat16
 LOG2E = 1.44269504
 
 
-def window_score_bias_attention(
+def convpe_attention(
     q: torch.Tensor,
     kv: torch.Tensor,
     sink: torch.Tensor = None,
@@ -732,7 +732,7 @@ def main(
     sink = torch.full((H,), 0.5, dtype=torch.float32, device="cuda").requires_grad_()
 
     # ---------- 数值对拍 ----------
-    O = window_score_bias_attention(Q, K, sink, score_bias, causal)
+    O = convpe_attention(Q, K, sink, score_bias, causal)
     O.backward(dO, retain_graph=True)
     dQ, Q.grad = Q.grad.clone(), None
     dK, K.grad = K.grad.clone(), None
@@ -761,7 +761,7 @@ def main(
 
     def run_fwd():
         with torch.no_grad():
-            window_score_bias_attention(Q, K, sink, score_bias, causal)
+            convpe_attention(Q, K, sink, score_bias, causal)
 
     def run_bwd():
         O.backward(dO, retain_graph=True)

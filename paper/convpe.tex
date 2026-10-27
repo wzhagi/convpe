@@ -176,17 +176,31 @@ In additional experiments, we also try using $X$ , $Q$\cite{chang2021convolution
 
 \subsection{Pretraining}
 
-We choose "\texttt{base w128d16}" as the ConvPE variant configuration for performance and throughput considerations. We train the RoPE baseline and the ConvPE variant from scratch on the first 3B tokens of FineWeb-Edu-10BT. We use Muon\cite{jordan2024muon} to optimize the 2D parameters, excluding the embedding layer and the language head, with a learning rate of $3\times10^{-3}$, while AdamW optimizes the remaining parameters at a learning rate of $3\times10^{-4}$, both using a cosine learning-rate schedule. The training hyperparameters are: batch size $4$, gradient accumulation steps $4$, sequence length $1024$, and seed $42$.
+We choose "\texttt{base w128d16}" as the ConvPE variant configuration for performance and throughput considerations. We train the RoPE baseline and the ConvPE variant from scratch on the first 3B tokens of FineWeb-Edu-10BT. We use Muon\cite{jordan2024muon} to optimize the 2D parameters, excluding the embedding layer and the language head, with a learning rate of $3\times10^{-3}$, while Adam\cite{DBLP:journals/corr/KingmaB14} optimizes the remaining parameters at a learning rate of $3\times10^{-4}$, both using a cosine learning-rate scheduler. The training hyperparameters are: batch size $4$, gradient accumulation steps $4$, sequence length $1024$, and seed $42$.
 
-\subsection{2D Vision Position Embedding}
+\begin{figure}[!ht]
+    \centering
+        \centering
+        \includegraphics[width=\linewidth]{FIGURES/pretrain.png}
+        \caption{Pretraining curve on first 3B tokens of FineWeb-Edu-10BT}
+        \label{fig:pretrain}
+\end{figure}
 
-To produce 2D positional embeddings, we use 2D convolutional layers with 2D input window and 2D output window. We use Multi-Head Attention (MHA) ViT-Tiny\cite{dosovitskiy2021image} models with configuration $N_{layers}=12$, $D_{model}=192$, $N_{heads}=3$, $D_{head}=64$. We train the models on CIFAR-10 and CIFAR-100\cite{krizhevsky2009learning} for 100 epochs with batch size $256$, patch shape $4\times 4$.
+Figure\ref{fig:pretrain} shows that ConvPE converge much farster and much better than the RoPE baseline.
 
-Table~\ref{tab:cifar} shows that ConvPE transfers effectively to vision transformers and outperforms the RoPE baseline. Increasing the window size and the projection dimension still improves model performance.
+\subsection{2D Position Embedding}
+
+To produce 2D positional embeddings, we use 2D convolutional layers that take
+a 2D window input and produce a 2D window output. We use ViT-Tiny~\cite{dosovitskiy2021image} models with Multi-Head Attention (MHA) and the configuration
+$N_{\mathrm{layers}}=12$, $D_{\mathrm{model}}=192$, $N_{\mathrm{heads}}=3$, and $D_{\mathrm{head}}=64$. We train the models on CIFAR-10 and CIFAR-100~\cite{krizhevsky2009learning} for 100 epochs with patch shape $4\times4$.
+
+Table~\ref{tab:cifar} shows that ConvPE transfers effectively to vision
+transformers and outperforms the RoPE baseline. The influence of
+hyperparameters requires further study on larger models and datasets.
 
 \begin{table}[!ht]
     \centering
-    \begin{minipage}[t]{0.48\textwidth}
+    \begin{minipage}[t]{0.8\textwidth}
         \centering
         \small
         \begin{tabular}{cccc}
@@ -194,33 +208,44 @@ Table~\ref{tab:cifar} shows that ConvPE transfers effectively to vision transfor
             model & params & CIFAR-10 & CIFAR-100 \\
             \midrule
             RoPE baseline    & 5.346M & 0.910 & 0.627 \\
-            ConvPE2D \texttt{w3d4}& 5.359M & \textbf{0.931} & 0.660 \\
-            ConvPE2D \texttt{w5d16}&5.503M & 0.928 & \textbf{0.669}\\
-            ConvNet & 4.335M & 0.945 & 0.737 \\
+            ConvPE2D \texttt{w3d4}& 5.359M & 0.931 & \textbf{0.695} \\
+            ConvPE2D \texttt{w3d8}& 5.372M & \textbf{0.933} & 0.683 \\
+            ConvPE2D \texttt{w5d4}& 5.402M & 0.929 & 0.682 \\
+            ConvNet & 4.335M & \textbf{0.945} & \textbf{0.737} \\
             \bottomrule
         \end{tabular}
-        \captionof{table}{Validation accuracy for 2D vision experiments on CIFAR-10 and CIFAR-100}
+        \captionof{table}{Validation accuracy on CIFAR-10 and CIFAR-100}
         \label{tab:cifar}
     \end{minipage}
 \end{table}
 
+\subsection{Kernel Optimization}
+
+We develop high-performance Flash MQA kernels implemented in TileLang.
+We benchmark base-model configurations \texttt{base rope} with $124.84$M
+parameters and \texttt{base w128d16} with $128.13$M parameters
+($+2.64\%$) using batch size $4$ and sequence length $1024$. The
+forward-pass time increases by $2.70\%$, slightly higher than the
+parameter-count increase. The training time increases by about $7\%$, while
+convergence, measured by the reduction in training loss, is accelerated by
+about $1.8\times$.
+
 \section{Conclusions and Future Work}
 
-ConvPE delivers substantial performance gains at a minor parameter cost, providing a powerful and parameter-efficient alternative for Transformer position modeling.
+ConvPE delivers substantial performance gains at a minor parameter and computational cost, providing a powerful alternative for positional embeddings. We adopt $H_b=1$ without any parameter-saving technique as the default configuration, which achieves the best balance among performance, parameter efficiency, and computational cost. ConvPE is compatible with RoPE, various attention masks, and KV-cache concatenation, and it naturally supports multidimensional extensions. 
 
-Based on our experiments, we summarize the following practical tuning guidelines:
+Future work can explore the following directions:
 \begin{itemize}
-	\item \textbf{Adopt $s16g16h4g1$ as the default configuration.} It achieves an optimal balance between performance and parameter efficiency.
-	\item \textbf{Scale the window size.} Increasing the window size yields continuous performance improvements.
-	\item \textbf{Expect larger gains at larger scales.} As the backbone model grows, ConvPE tends to deliver greater performance improvements and higher parameter efficiency.
-\end{itemize}
-
-ConvPE is compatible with different attention masks and KV-cache concatenation, and it naturally supports multidimensional extension. Future work can explore the following directions:
-\begin{itemize}
-	\item \textbf{Scaling behavior.} Investigate ConvPE with larger Transformers and datasets, and identify configuration patterns at scale.
-	\item \textbf{Long-context modeling.} Evaluate ConvPE in long-context settings, where positional generalization is particularly important.
-	\item \textbf{Architectural integration.} Combine ConvPE with Sliding Window Attention (SWA)\cite{beltagy2020longformer}, Compressed Sparse Attention (CSA)\cite{deepseek2026v4}, and other Transformer variants.
-	\item \textbf{Multidimensional modalities.} Extend ConvPE to high-dimensional modalities such as video, speech, and multimodal learning.
+    \item \textbf{Kernel Optimization.} Further optimize the backward kernel and     develop additional kernels for a wider range of hardware.
+    \item \textbf{Scaling behavior.} Investigate ConvPE with larger
+    Transformers and datasets, and identify configuration patterns at scale.
+    \item \textbf{Long-context modeling.} Evaluate ConvPE in long-context
+    settings, where positional generalization is particularly important.
+    \item \textbf{Architectural integration.} Combine ConvPE with Sliding
+    Window Attention (SWA)~\cite{beltagy2020longformer}, Compressed Sparse
+    Attention (CSA)~\cite{deepseek2026v4}, and other Transformer variants.
+    \item \textbf{Multidimensional modalities.} Extend ConvPE to
+    high-dimensional modalities such as vision, speech, and multimodal data.
 \end{itemize}
 
 

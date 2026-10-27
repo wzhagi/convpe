@@ -11,6 +11,7 @@ from transformers import (
     DataCollatorForLanguageModeling,
 )
 from trainer_model import LanguageModel, LanguageModelConfig
+from muon import AdamMuon, is_muon_param
 
 torch.backends.cudnn.benchmark = True
 VOCAB_SIZE = 50304  # pad 50257 to 50304
@@ -29,11 +30,12 @@ def main():
         num_heads=12,
         dim_head=128,
         dim_rope=0,
-        convpe_window_size=0,
-        convpe_dim_shared=0,
-        convpe_dim_headwise=0,
-        convpe_groups_shared=0,
-        convpe_groups_headwise=0,
+        convpe_win=0,
+        convpe_dim=0,
+        convpe_heads=0,
+        convpe_rank=0,
+        convpe_groups=1,
+        convpe_share=False,
         vocab_size=VOCAB_SIZE,
         max_seq_len=max_seq_len,
     )
@@ -42,27 +44,25 @@ def main():
     base_rope.name = "base_rope"
     base_rope.dim_rope = 64
 
-    def convpe_config(prototype, name):
+    def convpe_config(prototype, name: str):
         config = copy.deepcopy(prototype)
         config.name = f"{config.name}_{name}"
-        m = re.fullmatch(r"w(\d+)s(-?\d+)g(\d+)h(-?\d+)g(\d+)", name)
-        w, s, gs, h, gh = map(int, m.groups())
-        config.convpe_window_size = w
-        config.convpe_dim_shared = s
-        config.convpe_groups_shared = gs
-        config.convpe_dim_headwise = h
-        config.convpe_groups_headwise = gh
+        m = re.fullmatch(r"w(\d+)d(\d+)r(\d+)h(\d+)g(\d+)(s)?", name)
+        w, d, r, h, g, s = m.groups()
+        config.convpe_win = int(w)
+        config.convpe_dim = int(d)
+        config.convpe_rank = int(r)
+        config.convpe_heads = int(h)
+        config.convpe_groups = int(g)
+        config.convpe_share = s is not None
         return config
 
     configs = []
 
-    configs.append(base_rope)
-    # params: 768*((128*25+768*8)*12+50257)=124.71M
-    # compute per token: params + 1024*128*12*12=143.6M MAC
-
-    configs.append(convpe_config(base_nope, "w64s0g0h4g1"))
-    # extra params: (768*12*4+64*64*4)*12=0.64M +0.51%
-    # extra compute per token: (768*4+64*64*4)*12*12=2.8M MAC +1.95%
+    configs.append(base_rope)  # 2.7it/s 18.85h
+    # params: 768*((128*25+768*8)*12+50257)=124.7M
+    configs.append(convpe_config(base_nope, "w128d16r0h1g1"))  # 2.62it/s 20h
+    # params: 768*((128*25+768*8)*12+50257) + (768*16+16*128*128)*12 = 128.0M
 
     # ============ Dataset ============
     bin_path = "data/fineweb-4parquet.bin"
@@ -100,24 +100,32 @@ def run_train(config, train_dataset):
     print(f"\n=== training {config.name} ===")
     model = LanguageModel(config)
     print(model)
+    # print("tie weights:",model.tok_emb.weight is model.lm_head.weight)
+    # for n,p in model.named_parameters():
+    #     print("is muon param:",is_muon_param(n,p),n)
+
     output_dir = f"results_pretrain/{config.name}_{config.seed}"
 
     data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
     training_args = TrainingArguments(
         output_dir=output_dir,
-        num_train_epochs=1,
-        max_steps=1000,
         per_device_train_batch_size=4,
-        dataloader_drop_last=True,
-        learning_rate=3e-4,
+        gradient_accumulation_steps=4,
+        num_train_epochs=1,
+        max_steps=-1,
         lr_scheduler_type="cosine",
-        weight_decay=0.01,
-        max_grad_norm=1.0,
+        # lr_scheduler_type="warmup_stable_decay",
+        # lr_scheduler_kwargs={
+        #     "num_decay_steps": 40000,
+        #     "decay_type": "linear",
+        # },
+        warmup_steps=500,
+        max_grad_norm=4.0,
         logging_steps=100,
-        save_strategy="steps",
-        save_steps=10000,
-        save_total_limit=1,
+        save_steps=2000,
+        save_total_limit=2,
         report_to="none",
+        dataloader_drop_last=True,
         dataloader_num_workers=0,
         accelerator_config={
             "non_blocking": True,
@@ -134,6 +142,7 @@ def run_train(config, train_dataset):
         train_dataset=train_dataset,
         data_collator=data_collator,
         processing_class=tokenizer,
+        optimizers=(AdamMuon(model.named_parameters()), None),
     )
 
     trainer.train(resume_from_checkpoint=get_latest_checkpoint(output_dir))

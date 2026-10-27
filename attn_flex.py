@@ -8,7 +8,7 @@ from torch.nn.attention.flex_attention import (
 from functools import lru_cache
 
 
-def window_score_bias_attention(
+def convpe_attention(
     q: Tensor,
     kv: Tensor,
     sink: Tensor,

@@ -28,35 +28,27 @@ class LanguageModel(PreTrainedModel):
             self.rope = RotaryPositionalEmbedding(config.dim_rope, config.max_seq_len)
         else:
             self.rope = None
-        self.transformer = CausualTransformer(
-            config.num_layers,
-            config.dim_model,
-            config.num_heads,
-            config.dim_head,
-            config.dim_model * 8 // 3,
-            self.rope,
-            (
-                [
-                    ConvPE(
-                        config.dim_model,
-                        config.num_heads,
-                        config.convpe_window_size,
-                        config.convpe_dim_shared,
-                        config.convpe_dim_headwise,
-                        config.convpe_groups_shared,
-                        config.convpe_groups_headwise,
-                    )
-                    for _ in range(config.num_layers)
-                ]
-                if config.convpe_window_size > 0
-                else None
-            ),
-            config.max_seq_len,
+        self.transformer = Transformer(
+            num_layers=config.num_layers,
+            dim_model=config.dim_model,
+            num_heads=config.num_heads,
+            dim_head=config.dim_head,
+            dim_ffn=config.dim_model * 8 // 3,
+            convpe_win=config.convpe_win,
+            convpe_dim=config.convpe_dim,
+            convpe_heads=config.convpe_heads,
+            convpe_rank=config.convpe_rank,
+            convpe_groups=config.convpe_groups,
+            convpe_share=config.convpe_share,
+            rope=self.rope,
+            max_seq_len=config.max_seq_len,
         )
         self.lm_head = nn.Linear(config.dim_model, config.vocab_size, bias=False)
         self.post_init()
 
-    def forward(self, input_ids, labels=None, **kwargs) -> CausalLMOutputWithPast:
+    def forward(
+        self, input_ids, labels=None, attention_mask=None
+    ) -> CausalLMOutputWithPast:
         x = self.tok_emb(input_ids)
         x = self.transformer(x)
         logits = self.lm_head(x)

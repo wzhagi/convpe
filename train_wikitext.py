@@ -2,8 +2,7 @@ import os, copy, re
 
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
-import argparse
-import math
+import argparse, torch, math
 from transformers import (
     GPT2Tokenizer,
     Trainer,
@@ -13,6 +12,7 @@ from transformers import (
 from datasets import load_dataset, concatenate_datasets
 from trainer_model import LanguageModel, LanguageModelConfig
 
+torch.backends.cudnn.benchmark = True
 # ============ 数据集配置 ============
 TRAIN_DATASETS = [
     # {
@@ -57,13 +57,12 @@ def main(cfg: dict | None = None):
         "batch_size": 4,
         "lr": 3e-4,
         "block_size": 1024,
-        "num_workers": 4,
+        "num_workers": 2,
     }
     args = argparse.Namespace(**{**DEFAULTS, **(cfg or {})})
     configs = []
     eval_dirs = []
-    eval_dirs.append("results/tiny_rope_42")
-    eval_dirs.append("results/tiny_nope_w128s16g16h4g1_42")
+    # eval_dirs.append("results/tiny_rope_42")
 
     tiny_nope = LanguageModelConfig(
         name="tiny_nope",
@@ -73,11 +72,12 @@ def main(cfg: dict | None = None):
         num_heads=3,
         dim_head=64,
         dim_rope=0,
-        convpe_window_size=0,
-        convpe_dim_shared=0,
-        convpe_dim_headwise=0,
-        convpe_groups_shared=0,
-        convpe_groups_headwise=0,
+        convpe_win=0,
+        convpe_dim=0,
+        convpe_heads=1,
+        convpe_rank=0,
+        convpe_groups=1,
+        convpe_share=False,
         vocab_size=tokenizer.vocab_size,
         max_seq_len=args.block_size,
     )
@@ -87,7 +87,6 @@ def main(cfg: dict | None = None):
 
     base_nope = copy.deepcopy(tiny_nope)
     base_nope.name = "base_nope"
-    base_nope.num_layers = 12
     base_nope.dim_model = 768
     base_nope.num_heads = 12
     base_nope.dim_head = 128
@@ -96,30 +95,40 @@ def main(cfg: dict | None = None):
     base_rope.name = "base_rope"
     base_rope.dim_rope = 64
 
-    def convpe_config(prototype, name):
+    def convpe_config(prototype, name:str):
         config = copy.deepcopy(prototype)
         config.name = f"{config.name}_{name}"
-        m = re.fullmatch(r"w(\d+)s(-?\d+)g(\d+)h(-?\d+)g(\d+)", name)
-        if m is None:
-            raise ValueError(
-                f"Invalid convpe config name: {name!r}, "
-                f"expected format like 'w128s16g16h4g1'"
-            )
-        w, s, gs, h, gh = map(int, m.groups())
-        config.convpe_window_size = w
-        config.convpe_dim_shared = s
-        config.convpe_groups_shared = gs
-        config.convpe_dim_headwise = h
-        config.convpe_groups_headwise = gh
+        m = re.fullmatch(r"w(\d+)d(\d+)r(\d+)h(\d+)g(\d+)(s)?", name)
+        w, d, r, h, g, s = m.groups()
+        config.convpe_win = int(w)
+        config.convpe_dim = int(d)
+        config.convpe_rank = int(r)
+        config.convpe_heads = int(h)
+        config.convpe_groups = int(g)
+        config.convpe_share = s is not None
         return config
 
     configs.append(tiny_rope)
-    configs.append(convpe_config(tiny_nope, "w128s16g16h4g1"))
-    # configs.append(convpe_config(tiny_rope, "w128s16g16h4g1"))
-    
-    # configs.append(base_rope)
-    # configs.append(convpe_config(base_nope, "w128s16g16h4g1"))
-    # configs.append(convpe_config(base_rope, "w128s16g16h4g1"))
+    # configs.append(convpe_config(tiny_nope, "w128d6r0h3g1"))
+    # configs.append(convpe_config(tiny_rope, "w128d6r0h3g1"))
+    # configs.append(convpe_config(tiny_nope, "w128d6r0h1g1"))
+    # configs.append(convpe_config(tiny_nope, "w128d6r0h3g3"))
+    configs.append(convpe_config(tiny_nope, "w128d12r0h3g1"))
+    # configs.append(convpe_config(tiny_nope, "w64d6r0h3g1"))
+    # configs.append(convpe_config(tiny_nope, "w128d6r128h3g1"))
+    # configs.append(convpe_config(tiny_rope, "w128d6r128h3g1"))
+
+    # configs.append(base_rope)  # 11it/s
+
+    # configs.append(convpe_config(base_nope, "w128d4r0h1g1")) #10.6it/s
+    # configs.append(convpe_config(base_nope, "w128d8r0h1g1")) #10.5it/s
+    # configs.append(convpe_config(base_nope, "w128d16r0h1g1")) #10.4it/s
+    # configs.append(convpe_config(base_nope, "w128d4r0h4g1")) #10.4it/s
+    # configs.append(convpe_config(base_rope, "w128d16r0h1g1")) #10.2it/s
+
+    # configs.append(convpe_config(base_nope, "w128d4r128h4g1"))
+    # configs.append(convpe_config(base_nope, "w128d8r128h4g1"))
+    # configs.append(convpe_config(base_nope, "w128d16r0h4g4s"))
 
 
     print("========== configs to be trained ==========")
@@ -131,9 +140,6 @@ def main(cfg: dict | None = None):
         eval_dirs.append(output_dir)
     print("========== start evaluation ==========")
     for eval_dir in eval_dirs:
-        checkpoints = get_checkpoint_dirs(eval_dir)
-        for checkpoint_path in checkpoints:
-            run_eval(args, checkpoint_path)
         try:
             run_eval(args, eval_dir)
         except Exception:
@@ -190,6 +196,7 @@ def build_train_dataset(block_size):
 
 def run_train(args, config):
     model = LanguageModel(config)
+    print(model)
     output_dir = f"{args.output_dir}/{config.name}_{config.seed}"
     print(f"Output dir: {output_dir}")
     train_dataset = build_train_dataset(args.block_size)
@@ -199,15 +206,20 @@ def run_train(args, config):
         output_dir=output_dir,
         num_train_epochs=args.epochs,
         per_device_train_batch_size=args.batch_size,
+        dataloader_drop_last=True,
         learning_rate=args.lr,
         lr_scheduler_type="cosine",
         weight_decay=0.01,
         max_grad_norm=1.0,
         logging_steps=100,
-        save_strategy="epoch",
-        save_total_limit=None,
+        save_strategy="steps",
+        save_steps=5000,
+        save_total_limit=1,
         report_to="none",
         dataloader_num_workers=args.num_workers,
+        accelerator_config={
+            "non_blocking": True,
+        },
         remove_unused_columns=False,
         bf16=True,
         torch_compile=True,
