@@ -302,8 +302,14 @@ def get_checkpoint_dirs(root):
 
 def get_latest_checkpoint(output_dir):
     checkpoints = get_checkpoint_dirs(output_dir)
-    checkpoints.sort(key=lambda p: int(re.search(r"\d+", os.path.basename(p)).group()))
-    return checkpoints[-1] if checkpoints else None
+    if not checkpoints:
+        return None
+    latest = max(
+        checkpoints,
+        key=lambda p: int(re.search(r"\d+", os.path.basename(p)).group()),
+    )
+    model_file = os.path.join(latest, "model.safetensors")
+    return latest if os.path.isfile(model_file) else None
 
 
 if __name__ == "__main__":
