@@ -1,0 +1,77 @@
+{
+  "wikitext": {
+    "name": "wikitext",
+    "alias": "wikitext",
+    "sample_len": 62,
+    "word_perplexity,none": 42.0498192844977,
+    "word_perplexity_stderr,none": "N/A",
+    "byte_perplexity,none": 2.0121113449520474,
+    "byte_perplexity_stderr,none": "N/A",
+    "bits_per_byte,none": 1.008710142303209,
+    "bits_per_byte_stderr,none": "N/A"
+  },
+  "lambada_openai": {
+    "name": "lambada_openai",
+    "alias": "lambada_openai",
+    "sample_len": 5153,
+    "perplexity,none": 88.48659300865093,
+    "perplexity_stderr,none": 3.9333686327804553,
+    "acc,none": 0.2604308169998059,
+    "acc_stderr,none": 0.006114312937788448
+  },
+  "hellaswag": {
+    "name": "hellaswag",
+    "alias": "hellaswag",
+    "sample_len": 10042,
+    "acc,none": 0.29486158135829516,
+    "acc_stderr,none": 0.00455048618601887,
+    "acc_norm,none": 0.3272256522605059,
+    "acc_norm_stderr,none": 0.004682414968323861
+  },
+  "xstorycloze_en": {
+    "name": "xstorycloze_en",
+    "alias": "xstorycloze_en",
+    "sample_len": 1511,
+    "acc,none": 0.5526141628060887,
+    "acc_stderr,none": 0.012795688167385261
+  },
+  "piqa": {
+    "name": "piqa",
+    "alias": "piqa",
+    "sample_len": 1838,
+    "acc,none": 0.6338411316648531,
+    "acc_stderr,none": 0.011240106070308514,
+    "acc_norm,none": 0.6235038084874864,
+    "acc_norm_stderr,none": 0.011304341550126641
+  },
+  "arc_easy": {
+    "name": "arc_easy",
+    "alias": "arc_easy",
+    "sample_len": 2376,
+    "acc,none": 0.5420875420875421,
+    "acc_stderr,none": 0.010223371342195949,
+    "acc_norm,none": 0.4701178451178451,
+    "acc_norm_stderr,none": 0.010241444322886225
+  },
+  "winogrande": {
+    "name": "winogrande",
+    "alias": "winogrande",
+    "sample_len": 1267,
+    "acc,none": 0.5193370165745856,
+    "acc_stderr,none": 0.014041972733713017
+  },
+  "boolq": {
+    "name": "boolq",
+    "alias": "boolq",
+    "sample_len": 3270,
+    "acc,none": 0.5892966360856269,
+    "acc_stderr,none": 0.008604460608471526
+  },
+  "truthfulqa_mc1": {
+    "name": "truthfulqa_mc1",
+    "alias": "truthfulqa_mc1",
+    "sample_len": 817,
+    "acc,none": 0.23745410036719705,
+    "acc_stderr,none": 0.014896277441041869
+  }
+}

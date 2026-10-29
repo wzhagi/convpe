@@ -3,6 +3,7 @@ from torch import Tensor, nn
 from torch.nn import functional as F
 from convpe_exp import ConvPE
 from attn_tilelang import convpe_attention as attention
+# from attn_tilelang_fix_seq_len import convpe_attention as attention
 # from attn_flex import convpe_attention as attention
 
 
@@ -115,8 +116,8 @@ class MultiQueryAttention(nn.Module):
         if self.rope is not None:
             q = self.rope(q)
             kv = self.rope(kv)
-        score_bias = None if self.convpe is None else self.convpe(x).bfloat16()
-        o = attention(q.bfloat16(), kv.bfloat16(), self.sink, score_bias)
+        score_bias = None if self.convpe is None else self.convpe(x)
+        o = attention(q, kv, self.sink, score_bias)
         if self.rope is not None:
             o = self.rope(o, inverse=True)
         return self.wo(o.flatten(-2))

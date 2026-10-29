@@ -15,8 +15,7 @@ def convpe_attention(
     score_bias: torch.Tensor = None,
     causal: bool = True,
 ) -> torch.Tensor:
-    """
-    FlashAttention with banded score bias (per bias-head, GQA style) and sink.
+    """FlashAttention with banded score bias (per bias-head, GQA style) and sink.
 
     Args:
         q: Query tensor, shape ``(B, T, H, D)``.
@@ -27,6 +26,8 @@ def convpe_attention(
         sink: Optional attention-sink per head, shape ``(H,)``. ``None`` = no sink.
         causal: If ``True`` (default), apply causal masking.
     """
+    dtype_in = q.dtype
+    q, kv = q.to(dtype), kv.to(dtype)
     if q.dim() != 4 or kv.dim() != 4:
         raise ValueError(
             f"q and kv must be 4D (B, T, H, D), "
@@ -73,12 +74,17 @@ def convpe_attention(
     if sink is not None and sink.dtype != torch.float32:
         sink = sink.to(torch.float32)
 
-    return _attention.apply(q, kv, score_bias, sink, causal, groups)
+    return _attention.apply(q, kv, score_bias, sink, causal, groups).to(dtype_in)
 
 
 # ============================================================
 # Forward：full causal + windowed bias（per bias-head）+ attention sink
-# （保持原样，此 kernel 性能已达标）
+#
+# ★ 关键改动：
+#   - 签名去掉 seq_len
+#   - 内部用 T.symbolic("SEQ_LEN", "int32") 声明动态维度
+#   - 所有 seq_len 用法替换为 SEQ_LEN（循环边界 / 掩码 / min 截断）
+#   - out_idx=[4, 5] 不变（Output 在位置 4，lse 在位置 5）
 # ============================================================
 @tilelang.jit(
     out_idx=[4, 5],
@@ -87,7 +93,6 @@ def convpe_attention(
 def flashattn_fwd(
     batch,
     heads,
-    seq_len,
     dim,
     is_causal,
     block_M,
@@ -101,10 +106,13 @@ def flashattn_fwd(
     scale = (1.0 / dim) ** 0.5 * LOG2E
     sqrt_d_val = dim**0.5
     head_kv = heads // groups
-    head_b = heads // groups_b  # H_b
-    q_shape = [batch, seq_len, heads, dim]
-    k_shape = [batch, seq_len, head_kv, dim]
-    bias_shape = [batch, seq_len, head_b, W] if has_bias else [1, 1, 1, 1]
+    head_b = heads // groups_b
+    # ★ 动态序列长度
+    SEQ_LEN = T.symbolic("SEQ_LEN", "int32")
+
+    q_shape = [batch, SEQ_LEN, heads, dim]
+    k_shape = [batch, SEQ_LEN, head_kv, dim]
+    bias_shape = [batch, SEQ_LEN, head_b, W] if has_bias else [1, 1, 1, 1]
     accum_dtype = T.float32
 
     @T.prim_func
@@ -113,10 +121,10 @@ def flashattn_fwd(
         K: T.Tensor(k_shape, dtype),
         score_bias: T.Tensor(bias_shape, dtype),
         sink: T.Tensor([heads], accum_dtype),
-        Output: T.Tensor([batch, seq_len, heads, dim], dtype),
-        lse: T.Tensor([batch, heads, seq_len], accum_dtype),
+        Output: T.Tensor([batch, SEQ_LEN, heads, dim], dtype),
+        lse: T.Tensor([batch, heads, SEQ_LEN], accum_dtype),
     ):
-        with T.Kernel(T.ceildiv(seq_len, block_M), heads, batch, threads=256) as (
+        with T.Kernel(T.ceildiv(SEQ_LEN, block_M), heads, batch, threads=256) as (
             bx,
             by,
             bz,
@@ -139,7 +147,7 @@ def flashattn_fwd(
                 bias_shared = T.alloc_shared([block_M, W], dtype)
                 for i, ww in T.Parallel(block_M, W):
                     q_idx = bx * block_M + i
-                    q_idx_c = T.min(q_idx, seq_len - 1)
+                    q_idx_c = T.min(q_idx, SEQ_LEN - 1)
                     bias_shared[i, ww] = score_bias[bz, q_idx_c, by // groups_b, ww]
 
             T.copy(Q[bz, bx * block_M : (bx + 1) * block_M, by, :], Q_shared)
@@ -152,7 +160,7 @@ def flashattn_fwd(
                 loop_end = T.ceildiv((bx + 1) * block_M, block_N)
             else:
                 loop_start = 0
-                loop_end = T.ceildiv(seq_len, block_N)
+                loop_end = T.ceildiv(SEQ_LEN, block_N)
 
             for k in T.Pipelined(loop_start, loop_end, num_stages=num_stages):
                 T.copy(
@@ -169,7 +177,7 @@ def flashattn_fwd(
                 else:
                     for i, j in T.Parallel(block_M, block_N):
                         acc_s[i, j] = T.if_then_else(
-                            k * block_N + j >= seq_len,
+                            k * block_N + j >= SEQ_LEN,
                             -T.infinity(acc_s.dtype),
                             0,
                         )
@@ -237,24 +245,25 @@ def flashattn_fwd(
 
 
 # ============================================================
-# Backward preprocess / postprocess（保持不变）
+# Backward preprocess（seq_len 去掉，改为符号）
 # ============================================================
 @tilelang.jit(
     out_idx=[2],
     pass_configs={tilelang.PassConfigKey.TL_ENABLE_FAST_MATH: True},
 )
-def flashattn_bwd_preprocess(batch, heads, seq_len, dim):
+def flashattn_bwd_preprocess(batch, heads, dim):
     accum_dtype = T.float32
-    shape = [batch, seq_len, heads, dim]
+    SEQ_LEN = T.symbolic("SEQ_LEN", "int32")
+    shape = [batch, SEQ_LEN, heads, dim]
     blk = 32
 
     @T.prim_func
     def flash_bwd_prep(
         O: T.Tensor(shape, dtype),
         dO: T.Tensor(shape, dtype),
-        Delta: T.Tensor([batch, heads, seq_len], accum_dtype),
+        Delta: T.Tensor([batch, heads, SEQ_LEN], accum_dtype),
     ):
-        with T.Kernel(heads, T.ceildiv(seq_len, blk), batch) as (bx, by, bz):
+        with T.Kernel(heads, T.ceildiv(SEQ_LEN, blk), batch) as (bx, by, bz):
             o = T.alloc_fragment([blk, blk], dtype)
             do = T.alloc_fragment([blk, blk], dtype)
             acc = T.alloc_fragment([blk, blk], accum_dtype)
@@ -280,13 +289,17 @@ def make_dq_layout(dQ):
     )
 
 
+# ============================================================
+# Backward postprocess（seq_len 去掉，改为符号）
+# ============================================================
 @tilelang.jit(
     out_idx=[1],
     pass_configs={tilelang.PassConfigKey.TL_ENABLE_FAST_MATH: True},
 )
-def flashattn_bwd_postprocess(batch, heads, seq_len, dim):
+def flashattn_bwd_postprocess(batch, heads, dim):
     accum_dtype = T.float32
-    shape = [batch, seq_len, heads, dim]
+    SEQ_LEN = T.symbolic("SEQ_LEN", "int32")
+    shape = [batch, SEQ_LEN, heads, dim]
     blk = 64
 
     @T.prim_func
@@ -294,7 +307,7 @@ def flashattn_bwd_postprocess(batch, heads, seq_len, dim):
         dQ: T.Tensor(shape, accum_dtype),
         dQ_out: T.Tensor(shape, dtype),
     ):
-        with T.Kernel(T.ceildiv(seq_len, blk), heads, batch, threads=128) as (
+        with T.Kernel(T.ceildiv(SEQ_LEN, blk), heads, batch, threads=128) as (
             bx,
             by,
             bz,
@@ -309,18 +322,12 @@ def flashattn_bwd_postprocess(batch, heads, seq_len, dim):
 
 
 # ============================================================
-# Backward main kernel
-# ★ 优化点（不增加 shared 用量，反而净省 56KB）：
-#   P0: dB_full 改 [B,T,H,W]，head 间无冲突（原来 groups_b 个 head 争用同一位置）
-#   P1: bias 从 global gather 改成 bias_tile shared 预加载（+8KB）
-#   P2: 加 T.use_swizzle
-#   P3: 去掉 dk_shared（fp32 128x128=64KB），改为逐元素 atomic_add(dk[i,j]+dv[i,j])
+# Backward main kernel（seq_len 去掉，改为符号）
 # ============================================================
 @tilelang.jit(pass_configs={tilelang.PassConfigKey.TL_ENABLE_FAST_MATH: True})
 def flashattn_bwd_atomic_add(
     batch,
     heads,
-    seq_len,
     dim,
     is_causal,
     block_M,
@@ -337,11 +344,12 @@ def flashattn_bwd_atomic_add(
     sqrt_d_val = dim**0.5
     head_kv = heads // groups
     head_b = heads // groups_b
+    SEQ_LEN = T.symbolic("SEQ_LEN", "int32")
 
-    q_shape = [batch, seq_len, heads, dim]
-    k_shape = [batch, seq_len, head_kv, dim]
-    bias_shape = [batch, seq_len, head_b, W] if has_bias else [1, 1, 1, 1]
-    dB_shape = [batch, seq_len, heads, W] if has_bias else [1, 1, 1, 1]  # per-head
+    q_shape = [batch, SEQ_LEN, heads, dim]
+    k_shape = [batch, SEQ_LEN, head_kv, dim]
+    bias_shape = [batch, SEQ_LEN, head_b, W] if has_bias else [1, 1, 1, 1]
+    dB_shape = [batch, SEQ_LEN, heads, W] if has_bias else [1, 1, 1, 1]
     accum_dtype = T.float32
 
     @T.prim_func
@@ -350,15 +358,15 @@ def flashattn_bwd_atomic_add(
         K: T.Tensor(k_shape, dtype),
         score_bias: T.Tensor(bias_shape, dtype),
         sink: T.Tensor([heads], accum_dtype),
-        dO: T.Tensor([batch, seq_len, heads, dim], dtype),
-        lse: T.Tensor([batch, heads, seq_len], accum_dtype),
-        Delta: T.Tensor([batch, heads, seq_len], accum_dtype),
+        dO: T.Tensor([batch, SEQ_LEN, heads, dim], dtype),
+        lse: T.Tensor([batch, heads, SEQ_LEN], accum_dtype),
+        Delta: T.Tensor([batch, heads, SEQ_LEN], accum_dtype),
         dQ: T.Tensor(q_shape, accum_dtype),
-        dK_full: T.Tensor([batch, seq_len, heads, dim], accum_dtype),
+        dK_full: T.Tensor([batch, SEQ_LEN, heads, dim], accum_dtype),
         dB_full: T.Tensor(dB_shape, accum_dtype),
         d_sink_bh: T.Tensor([batch, heads], accum_dtype),
     ):
-        with T.Kernel(heads, T.ceildiv(seq_len, block_M), batch, threads=threads) as (
+        with T.Kernel(heads, T.ceildiv(SEQ_LEN, block_M), batch, threads=threads) as (
             bx,
             by,
             bz,
@@ -378,8 +386,7 @@ def flashattn_bwd_atomic_add(
             dv = T.alloc_fragment([block_M, dim], accum_dtype)
             dk = T.alloc_fragment([block_M, dim], accum_dtype)
             dq = T.alloc_fragment([block_N, dim], accum_dtype)
-            dkdv = T.alloc_fragment([block_M, dim], accum_dtype)  # ★ dK+dV 中转
-            # ★ dk_shared 已删除（省 64KB）
+            dkdv = T.alloc_fragment([block_M, dim], accum_dtype)
 
             sink_acc = T.alloc_fragment([block_N], accum_dtype)
             sink_total = T.alloc_fragment([1], accum_dtype)
@@ -395,10 +402,10 @@ def flashattn_bwd_atomic_add(
 
             if is_causal:
                 loop_st = T.floordiv(by * block_M, block_N)
-                loop_ed = T.ceildiv(seq_len, block_N)
+                loop_ed = T.ceildiv(SEQ_LEN, block_N)
             else:
                 loop_st = 0
-                loop_ed = T.ceildiv(seq_len, block_N)
+                loop_ed = T.ceildiv(SEQ_LEN, block_N)
 
             for k in T.Pipelined(loop_st, loop_ed, num_stages=num_stages):
                 T.copy(Q[bz, k * block_N : (k + 1) * block_N, bx, :], q)
@@ -414,11 +421,11 @@ def flashattn_bwd_atomic_add(
                         k_idx = by * block_M + i
                         w_idx = q_idx - k_idx
                         in_causal = (
-                            (w_idx >= 0) and (q_idx < seq_len) and (k_idx < seq_len)
+                            (w_idx >= 0) and (q_idx < SEQ_LEN) and (k_idx < SEQ_LEN)
                         )
                         in_window = in_causal and (w_idx < W)
                         w_c = T.min(T.max(w_idx, 0), W - 1)
-                        q_idx_c = T.min(q_idx, seq_len - 1)
+                        q_idx_c = T.min(q_idx, SEQ_LEN - 1)
                         bias_val = T.if_then_else(
                             in_window,
                             T.cast(
@@ -438,7 +445,9 @@ def flashattn_bwd_atomic_add(
                         q_idx = k * block_N + j
                         k_idx = by * block_M + i
                         in_causal = (
-                            (q_idx >= k_idx) and (q_idx < seq_len) and (k_idx < seq_len)
+                            (q_idx >= k_idx)
+                            and (q_idx < SEQ_LEN)
+                            and (k_idx < SEQ_LEN)
                         )
                         qkT[i, j] = T.if_then_else(
                             in_causal,
@@ -462,7 +471,7 @@ def flashattn_bwd_atomic_add(
                 if by == 0:
                     for j in T.Parallel(block_N):
                         q_idx = k * block_N + j
-                        valid = q_idx < seq_len
+                        valid = q_idx < SEQ_LEN
                         p_sink = T.exp2(sink2 - lse_shared[j])
                         contrib = T.if_then_else(
                             valid, -p_sink * delta[j], T.float32(0)
@@ -475,12 +484,11 @@ def flashattn_bwd_atomic_add(
                         k_idx = by * block_M + i
                         w_idx = q_idx - k_idx
                         in_causal = (
-                            (w_idx >= 0) and (q_idx < seq_len) and (k_idx < seq_len)
+                            (w_idx >= 0) and (q_idx < SEQ_LEN) and (k_idx < SEQ_LEN)
                         )
                         in_window = in_causal and (w_idx < W)
                         d_bias = qkT[i, j] * (dsT[i, j] - delta[j])
                         dsT_cast[i, j] = d_bias * sm_scale
-                        # ★ per-head dB 无 conflict，普通 store，且 in_window 内才写
                         if in_window:
                             dB_full[bz, q_idx, bx, w_idx] = d_bias
                 else:
@@ -492,7 +500,6 @@ def flashattn_bwd_atomic_add(
                 T.copy(dsT_cast, dsT_shared)
                 T.clear(dq)
                 T.gemm(dsT_shared, K_shared, dq, transpose_A=True)
-                # dQ 仍需 atomic（多 by 写同一 q 行）
                 for i, j in T.Parallel(block_N, dim):
                     T.atomic_add(dQ[bz, k * block_N + i, bx, j], dq[i, j])
 
@@ -500,7 +507,6 @@ def flashattn_bwd_atomic_add(
                 T.reduce_sum(sink_acc, sink_total, dim=0)
                 T.copy(sink_total, d_sink_bh[bz, bx : bx + 1])
 
-            # ★ dK 无 conflict：dk+dv 到中转 fragment 后 T.copy 普通写
             for i, j in T.Parallel(block_M, dim):
                 dkdv[i, j] = dk[i, j] + dv[i, j]
             T.copy(dkdv, dK_full[bz, by * block_M : (by + 1) * block_M, bx, :])
@@ -510,6 +516,8 @@ def flashattn_bwd_atomic_add(
 
 # ============================================================
 # Autograd wrapper
+# ★ 调用侧去掉 N_CTX（不再作为 jit 的编译期参数），
+#   主机侧分配 buffer 时仍按实际 N_CTX
 # ============================================================
 @torch.compile
 class _attention(torch.autograd.Function):
@@ -532,10 +540,10 @@ class _attention(torch.autograd.Function):
             sb_bf16 = None
 
         block_M, block_N = 128, 64
+        # ★ 不再传 N_CTX
         mod = flashattn_fwd(
             BATCH,
             H,
-            N_CTX,
             D_HEAD,
             causal,
             block_M,
@@ -576,15 +584,16 @@ class _attention(torch.autograd.Function):
 
         do, q, k, o = [maybe_contiguous(x) for x in (do, q, k, o)]
 
-        mod_prep = flashattn_bwd_preprocess(BATCH, H, N_CTX, D_HEAD)
-        mod_post = flashattn_bwd_postprocess(BATCH, H, N_CTX, D_HEAD)
+        # ★ 不再传 N_CTX
+        mod_prep = flashattn_bwd_preprocess(BATCH, H, D_HEAD)
+        mod_post = flashattn_bwd_postprocess(BATCH, H, D_HEAD)
         delta = mod_prep(o, do)
 
         block_M, block_N = 128, 32
+        # ★ 不再传 N_CTX
         kernel = flashattn_bwd_atomic_add(
             BATCH,
             H,
-            N_CTX,
             D_HEAD,
             ctx.causal,
             block_M,
@@ -603,7 +612,6 @@ class _attention(torch.autograd.Function):
         )
 
         if has_bias:
-            # ★ P0: per-head dB buffer（不再是 head_b），后续一次性 sum
             db_split = torch.zeros(
                 [BATCH, N_CTX, H, W], dtype=torch.float32, device=q.device
             )
@@ -620,7 +628,6 @@ class _attention(torch.autograd.Function):
         dk = dk_full.view(BATCH, N_CTX, HEAD_KV, groups, D_HEAD).sum(dim=3).to(dtype)
 
         if has_bias:
-            # bx = hb * groups_b + g，即 view 成 [B,T,H_b,groups_b,W] 后 sum(g)
             d_score_bias = (
                 db_split.view(BATCH, N_CTX, H_b, groups_b, W)
                 .sum(dim=3)
@@ -634,7 +641,7 @@ class _attention(torch.autograd.Function):
 
 
 # ============================================================
-# Reference（支持 score_bias 为 (B, T, H_b, W)，per-bias-head GQA）
+# Reference
 # ============================================================
 def ref_program(Q, K, sink, score_bias, is_causal):
     B, T, HQ, D = Q.shape
@@ -643,7 +650,7 @@ def ref_program(Q, K, sink, score_bias, is_causal):
 
     if is_causal:
         idx = torch.arange(T, device=Q.device)
-        w_idx = idx.unsqueeze(1) - idx.unsqueeze(0)  # (T, T), q - k
+        w_idx = idx.unsqueeze(1) - idx.unsqueeze(0)
         causal_ok = w_idx >= 0
 
         if score_bias is not None:
@@ -651,16 +658,16 @@ def ref_program(Q, K, sink, score_bias, is_causal):
             H_b = score_bias.shape[2]
             W = score_bias.shape[3]
             groups_b = HQ // H_b
-            in_window = causal_ok & (w_idx < W)  # (T, T)
-            w_c = w_idx.clamp(0, W - 1)  # (T, T)
+            in_window = causal_ok & (w_idx < W)
+            w_c = w_idx.clamp(0, W - 1)
 
-            sb_hq = score_bias.repeat_interleave(groups_b, dim=2)  # (B, T, HQ, W)
+            sb_hq = score_bias.repeat_interleave(groups_b, dim=2)
             w_c_exp = w_c.view(1, T, 1, T).expand(B, T, HQ, T)
-            gathered = sb_hq.gather(3, w_c_exp)  # (B, T, HQ, T)
+            gathered = sb_hq.gather(3, w_c_exp)
             bias_dense = torch.where(
                 in_window.view(1, T, 1, T), gathered, torch.zeros_like(gathered)
             )
-            bias_dense = bias_dense.permute(0, 2, 1, 3)  # (B, HQ, T, T)
+            bias_dense = bias_dense.permute(0, 2, 1, 3)
         else:
             bias_dense = torch.zeros(B, HQ, T, T, device=Q.device, dtype=q.dtype)
 
@@ -804,81 +811,3 @@ if __name__ == "__main__":
                 w,
                 hb,
             )
-
-"""
-w: 0, hb: 1
-tilelang fwd: 0.84 ms, 61.00 TFlops
-tilelang bwd: 2.39 ms, 53.81 TFlops
-w: 1, hb: 1
-tilelang fwd: 0.85 ms, 60.32 TFlops
-tilelang bwd: 2.50 ms, 51.47 TFlops
-w: 1, hb: 2
-tilelang fwd: 0.86 ms, 59.80 TFlops
-tilelang bwd: 2.53 ms, 50.99 TFlops
-w: 1, hb: 3
-tilelang fwd: 0.85 ms, 60.48 TFlops
-tilelang bwd: 2.50 ms, 51.48 TFlops
-w: 1, hb: 4
-tilelang fwd: 0.86 ms, 59.84 TFlops
-tilelang bwd: 2.52 ms, 51.16 TFlops
-w: 1, hb: 6
-tilelang fwd: 0.85 ms, 60.47 TFlops
-tilelang bwd: 2.54 ms, 50.67 TFlops
-w: 1, hb: 12
-tilelang fwd: 0.87 ms, 59.46 TFlops
-tilelang bwd: 2.56 ms, 50.26 TFlops
-w: 32, hb: 1
-tilelang fwd: 0.86 ms, 60.27 TFlops
-tilelang bwd: 2.71 ms, 47.57 TFlops
-w: 32, hb: 2
-tilelang fwd: 0.86 ms, 60.16 TFlops
-tilelang bwd: 2.74 ms, 47.01 TFlops
-w: 32, hb: 3
-tilelang fwd: 0.86 ms, 60.24 TFlops
-tilelang bwd: 2.63 ms, 49.05 TFlops
-w: 32, hb: 4
-tilelang fwd: 0.86 ms, 59.84 TFlops
-tilelang bwd: 2.75 ms, 46.93 TFlops
-w: 32, hb: 6
-tilelang fwd: 0.86 ms, 59.79 TFlops
-tilelang bwd: 2.64 ms, 48.79 TFlops
-w: 32, hb: 12
-tilelang fwd: 0.87 ms, 59.57 TFlops
-tilelang bwd: 2.80 ms, 46.05 TFlops
-w: 64, hb: 1
-tilelang fwd: 0.87 ms, 59.28 TFlops
-tilelang bwd: 2.75 ms, 46.85 TFlops
-w: 64, hb: 2
-tilelang fwd: 0.88 ms, 58.67 TFlops
-tilelang bwd: 2.67 ms, 48.23 TFlops
-w: 64, hb: 3
-tilelang fwd: 0.94 ms, 54.85 TFlops
-tilelang bwd: 2.67 ms, 48.22 TFlops
-w: 64, hb: 4
-tilelang fwd: 0.88 ms, 58.39 TFlops
-tilelang bwd: 2.68 ms, 47.99 TFlops
-w: 64, hb: 6
-tilelang fwd: 0.95 ms, 54.13 TFlops
-tilelang bwd: 2.71 ms, 47.53 TFlops
-w: 64, hb: 12
-tilelang fwd: 0.90 ms, 56.96 TFlops
-tilelang bwd: 2.91 ms, 44.29 TFlops
-w: 128, hb: 1
-tilelang fwd: 0.87 ms, 59.35 TFlops
-tilelang bwd: 2.81 ms, 45.82 TFlops
-w: 128, hb: 2
-tilelang fwd: 0.87 ms, 59.06 TFlops
-tilelang bwd: 2.93 ms, 43.99 TFlops
-w: 128, hb: 3
-tilelang fwd: 0.88 ms, 58.42 TFlops
-tilelang bwd: 2.84 ms, 45.39 TFlops
-w: 128, hb: 4
-tilelang fwd: 0.88 ms, 58.75 TFlops
-tilelang bwd: 2.96 ms, 43.49 TFlops
-w: 128, hb: 6
-tilelang fwd: 0.90 ms, 57.56 TFlops
-tilelang bwd: 2.93 ms, 44.00 TFlops
-w: 128, hb: 12
-tilelang fwd: 0.93 ms, 55.63 TFlops
-tilelang bwd: 3.08 ms, 41.80 TFlops
-"""

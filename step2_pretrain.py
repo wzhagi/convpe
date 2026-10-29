@@ -56,10 +56,10 @@ def main():
         config.convpe_groups = int(g)
         config.convpe_share = s is not None
         return config
-    
+
     configs = []
-    configs.append(base_rope)  # 2.7it/s 18.85h
-    configs.append(convpe_config(base_nope, "w128d16r0h1g1"))  # 2.6it/s 19.6h
+    configs.append(base_rope)  # 2.77it/s
+    configs.append(convpe_config(base_nope, "w128d16r0h1g1"))  # 2.60it/s
     print("========== configs to be trained ==========")
     for config in configs:
         print(config.name)
@@ -102,27 +102,20 @@ def run_train(config, train_dataset):
     # print("tie weights:",model.tok_emb.weight is model.lm_head.weight)
     # for n,p in model.named_parameters():
     #     print("is muon param:",is_muon_param(n,p),n)
-
     output_dir = f"results_pretrain/{config.name}_{config.seed}"
-
     data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
     training_args = TrainingArguments(
         output_dir=output_dir,
         per_device_train_batch_size=4,
         gradient_accumulation_steps=4,
         num_train_epochs=1,
-        max_steps=-1,
+        max_steps=2000,
         lr_scheduler_type="cosine",
-        # lr_scheduler_type="warmup_stable_decay",
-        # lr_scheduler_kwargs={
-        #     "num_decay_steps": 40000,
-        #     "decay_type": "linear",
-        # },
         warmup_steps=500,
         max_grad_norm=4.0,
         logging_steps=100,
         save_steps=2000,
-        save_total_limit=2,
+        save_total_limit=1,
         report_to="none",
         dataloader_drop_last=True,
         dataloader_num_workers=0,

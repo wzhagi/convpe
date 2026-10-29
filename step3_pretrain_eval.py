@@ -10,9 +10,10 @@ from lm_eval import evaluator
 
 from trainer_model import LanguageModel
 
+torch._dynamo.config.recompile_limit = 64
 CHECKPOINTS = [
     "results_pretrain/base_rope_42",
-    "results_pretrain/base_nope_w64s0g0h4g1_42",
+    "results_pretrain/base_nope_w128d16r0h1g1_42",
 ]
 TASKS = [
     "wikitext",
@@ -34,12 +35,14 @@ def main():
         print(tokenizer)
         model = LanguageModel.from_pretrained(checkpoint).to("cuda")
         print(model)
-        model = torch.compile(model)
+        model.eval()
+        model.compile()
 
-        result = evaluator.simple_evaluate(
-            model=HFLM(pretrained=model, tokenizer=tokenizer, batch_size="auto"),
-            tasks=TASKS,
-        )
+        with torch.autocast("cuda", dtype=torch.bfloat16):
+            result = evaluator.simple_evaluate(
+                model=HFLM(pretrained=model, tokenizer=tokenizer, batch_size=4),
+                tasks=TASKS,
+            )
         results[checkpoint] = result["results"]
         out_path = os.path.join(checkpoint, "pretrain_eval.txt")
         with open(out_path, "w", encoding="utf-8") as f:

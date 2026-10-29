@@ -1,7 +1,12 @@
 # ConvPE
-ConvPE 卷积位置编码显著提升了Transformer的参数效率和训练性能。0.51%的额外参数和1.95%的额外计算，换取0.14 (4.32%)的预训练loss下降，从3.24降到3.1。
+卷积位置编码（ConvPE）显著改善了 Transformer 的性能与样本效率。相比基线模型，ConvPE 仅增加 2.64% 的参数和 2.70% 的前向推理时间，却将训练损失降低 2.82%。达到基线最终训练损失所需的 token 仅为基线的 68.7%，且在本文评测的多数任务上优于基线。
 
-ConvPE (Convolutional Position Embedding) substantially improves both the parameter efficiency and training performance of Transformers. At the cost of only 0.51% additional parameters and 1.95% additional computation, it achieves a 0.14 (4.32%) reduction in pretraining loss, decreasing from 3.24 to 3.1.
+ConvPE (Convolutional Position Embedding) substantially improves both the
+performance and sample efficiency of Transformer models. At the cost of only
+2.64\% more parameters and a 2.70\% increase in forward-pass time, it achieves
+a 2.82\% reduction in training loss and substantial improvements on most
+evaluation benchmarks. It also requires only 68.7\% of the training tokens
+needed by the baseline to reach the baseline's final training loss.
 
 | ![convpe](/paper/FIGURES/convpe.jpeg) | ![score_bias](/paper/FIGURES/score_bias.jpeg) |
 |---|---|
@@ -12,22 +17,21 @@ ConvPE (Convolutional Position Embedding) substantially improves both the parame
 
 ## Pretraining Evaluations
 
-| Dataset | Metric | RoPE 124.7M | ConvPE 125.3M | Random |
+| Dataset | Metric | base_rope_42 | base_nope_w128d16r0h1g1_42 | Random |
 |:---:|:---:|:---:|:---:|:---:|
-| wikitext | perplexity | 55.6150 | **46.5696(-9.0454)** |-|
-| lambada | perplexity | 354.7769 | **139.2030(-215.5739)** |-|
-| lambada | acc | 0.1760 | **0.2457(+0.0697)** |0|
-| hellaswag | acc | 0.2798 | **0.2944(+0.0145)** |0.25|
-| hellaswag | acc_norm | 0.2913 | **0.3141(+0.0228)** |0.25|
-| xstorycloze_en | acc | 0.5367 | **0.5606(+0.0238)** |0.5|
-| piqa | acc | 0.6251 | **0.6409(+0.0158)** |0.5|
-| piqa | acc_norm | 0.6099 | **0.6349(+0.0250)** |0.5|
-| arc_easy | acc | 0.4958 | **0.4996(+0.0038)** |0.25|
-| arc_easy | acc_norm | 0.4474 | **0.4646(+0.0173)** |0.25|
-| winogrande | acc | **0.5083** | 0.4996(-0.0087) |0.5|
-| boolq | acc | 0.5994 |**0.6006(+0.0012)** |0.5|
-| truthfulqa_mc1 | acc | 0.2485 | 0.2338(-0.0147) |**0.25**|
-
+| wikitext | perplexity | 46.5636 | **42.0498(-4.5138)** |-|
+| lambada_openai | perplexity | 118.1028 | **88.4866(-29.6162)** |-|
+| lambada_openai | acc | 0.2507 | **0.2604(+0.0097)** |0|
+| hellaswag | acc | 0.2894 | **0.2949(+0.0055)** |0.25|
+| hellaswag | acc_norm | 0.3148 | **0.3272(+0.0124)** |0.25|
+| xstorycloze_en | acc | 0.5460 | **0.5526(+0.0066)** |0.5|
+| piqa | acc | 0.6251 | **0.6338(+0.0087)** |0.5|
+| piqa | acc_norm | 0.6208 | **0.6235(+0.0027)**|0.5|
+| arc_easy | acc | 0.5114 | **0.5421(+0.0307)** |0.25|
+| arc_easy | acc_norm | 0.4487 | **0.4701(+0.0215)** |0.25|
+| winogrande | acc | 0.5091 | **0.5193(+0.0103)** |0.5|
+| boolq | acc | 0.5676 | **0.5893(+0.0217)** |0.5|
+| truthfulqa_mc1 | acc | 0.2399 | 0.2375(-0.0024) |**0.25**|
 
 ## ConvPE2D validation accuracy on CIFAR-10, CIFAR-100.
 |model|CIFAR-10 valid acc|CIFAR-100 valid acc|
@@ -43,16 +47,16 @@ ConvPE (Convolutional Position Embedding) substantially improves both the parame
     apt install python3-dev
     pip install -r requirements.txt
 
-Edit transformer_convpe.py and use
+#### Edit transformer_convpe.py import
 
     from attn_flex import convpe_attention as attention
 
 ### Tilelang kernels (Alternative)
-Make sure your torch cuda version and tilelang cuda version is the same with python venv cuda version or system cuda version
+#### Make sure your torch cuda version and tilelang cuda version is the same with python venv cuda version or system cuda version
 
     pip install -r requirements_tilelang.txt
 
-Edit transformer_convpe.py and use
+#### Edit transformer_convpe.py import
 
     from attn_tilelang import convpe_attention as attention
 
@@ -60,7 +64,7 @@ Edit transformer_convpe.py and use
 
     python3 train_wikitext.py
 
-Run train_wikitext_plot.ipynb to see results.
+#### Run train_wikitext_plot.ipynb to see results.
 
     python3 train_cifar.py
 
@@ -83,15 +87,15 @@ https://www.modelscope.cn/datasets/AI-ModelScope/fineweb-edu/tree/master/sample/
 
 #### Train full dataset (Optional)
 
-    set step2_pretrain.py TrainingArguments max_steps=1000 to -1
+    set step2_pretrain.py TrainingArguments max_steps=2000 to -1
 
 #### Start training
     python3 step2_pretrain.py
 
-Run step2_plot.ipynb to see results.
+#### Run step2_plot.ipynb to see results.
 
 ### 3. Pre-training evaluation
 
     python3 step3_pretrain_eval.py
 
-Run step3_plot.ipynb to see results.
+#### Run step3_plot.ipynb to see results.
