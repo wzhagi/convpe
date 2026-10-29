@@ -56,14 +56,10 @@ def main():
         config.convpe_groups = int(g)
         config.convpe_share = s is not None
         return config
-
+    
     configs = []
-
     configs.append(base_rope)  # 2.7it/s 18.85h
-    # params: 768*((128*25+768*8)*12+50257)=124.7M
-    configs.append(convpe_config(base_nope, "w128d16r0h1g1"))  # 2.62it/s 20h
-    # params: 768*((128*25+768*8)*12+50257) + (768*16+16*128*128)*12 = 128.0M
-
+    configs.append(convpe_config(base_nope, "w128d16r0h1g1"))  # 2.6it/s 19.6h
     print("========== configs to be trained ==========")
     for config in configs:
         print(config.name)

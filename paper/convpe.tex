@@ -143,13 +143,9 @@ hyperparameters:
 All models in our experiments use Multi-Query Attention (MQA)\cite{shazeer2019fast}, with $K=V$\cite{deepseek2026v4}. Each attention layer has $D_{model} \times D_{head} \times (2\times N_{heads}+1)$ parameters. Each feed-forward layer uses SwiGLU\cite{shazeer2020glu} and has $8\times D_{model}^2$ parameters. 
 
 \subsection{Hyperparameter Search}
-We train each model for one epoch on WikiText-103~\cite{merity2016pointer}
-and record the validation loss. Training uses the Hugging Face
-Trainer~\cite{wolf2020transformers}, AdamW~\cite{loshchilov2019decoupled},
-and the GPT-2 tokenizer~\cite{radford2019language}. The training
-hyperparameters are: batch size $4$, learning rate $3\times10^{-4}$ with cosine learning-rate scheduler, sequence length $1024$, and seed $42$.
+We train each model for one epoch on WikiText-103~\cite{merity2016pointer} and record the validation loss. Training uses the Hugging Face Trainer~\cite{wolf2020transformers}, AdamW~\cite{loshchilov2019decoupled}, and the GPT-2 tokenizer~\cite{radford2019language}. The training hyperparameters are: batch size $4$, sequence length $1024$, learning rate $3\times10^{-4}$ with cosine learning-rate scheduler, and seed $42$.
 
-We train two types of backbone models, a tiny backbone with $N_{layers}=12$, $D_{model}=192$, $N_{heads}=3$, $D_{head}=64$, and a base backbone with $N_{layers}=12$, $D_{model}=768$, $N_{heads}=12$, $D_{head}=128$. The model name format is "\texttt{backbone RoPE/NoPE  $W$ $C$ $\mathrm{Rank}$ $H_{b}$ $\mathrm{Groups}$ $\mathrm{Share}$}". For example, "\texttt{tiny rope w128d6r128h3g1s}" denotes a tiny backbone using RoPE with $W=128$, $C=6$, $\mathrm{Rank}=128$, $H_b=3$, $\mathrm{Groups}=1$, and $\mathrm{Share}$ weights. For simplicity, model names omit the default configuration: \texttt{NoPE}, \texttt{r0}(no low-rank convolution), \texttt{h1} ($H_b=1$), \texttt{g1}($\mathrm{Groups}=1$), and \texttt{s0} (no weight sharing).
+We train two types of backbone models, a tiny backbone with $N_{layers}=12$, $D_{model}=192$, $N_{heads}=3$, $D_{head}=64$, and a base backbone with $N_{layers}=12$, $D_{model}=768$, $N_{heads}=12$, $D_{head}=128$. The model name format is "\texttt{backbone RoPE/NoPE  $W$ $C$ $\mathrm{Rank}$ $H_{b}$ $\mathrm{Groups}$ $\mathrm{Share}$}". For example, "\texttt{tiny rope w128d6r128h3g1s}" denotes a tiny backbone using RoPE with $W=128$, $C=6$, $\mathrm{Rank}=128$, $H_b=3$, $\mathrm{Groups}=1$, and $\mathrm{Share}$ weights. For simplicity, model names may omit the default configuration: \texttt{NoPE}, \texttt{r0}(no low-rank convolution), \texttt{h1} ($H_b=1$), \texttt{g1}($\mathrm{Groups}=1$), and \texttt{s0} (no weight sharing).
 
 \begin{figure}[!ht]
     \centering
@@ -176,7 +172,7 @@ In additional experiments, we also try using $X$ , $Q$\cite{chang2021convolution
 
 \subsection{Pretraining}
 
-We choose "\texttt{base w128d16}" as the ConvPE variant configuration for performance and throughput considerations. We train the RoPE baseline and the ConvPE variant from scratch on the first 3B tokens of FineWeb-Edu-10BT. We use Muon\cite{jordan2024muon} to optimize the 2D parameters, excluding the embedding layer and the language head, with a learning rate of $3\times10^{-3}$, while Adam\cite{DBLP:journals/corr/KingmaB14} optimizes the remaining parameters at a learning rate of $3\times10^{-4}$, both using a cosine learning-rate scheduler. The training hyperparameters are: batch size $4$, gradient accumulation steps $4$, sequence length $1024$, and seed $42$.
+We choose "\texttt{base w128d16}" as the ConvPE variant configuration for performance and throughput considerations. We train the RoPE baseline \texttt{base RoPE} and the ConvPE variant from scratch on the first 3B tokens of FineWeb-Edu-10BT. We use Muon\cite{jordan2024muon} to optimize the 2D parameters, excluding the embedding layer and the language head, with a learning rate of $3\times10^{-3}$, while Adam\cite{DBLP:journals/corr/KingmaB14} optimizes the remaining parameters at a learning rate of $3\times10^{-4}$, both using a cosine learning-rate scheduler. The training hyperparameters are: batch size $4$, gradient accumulation steps $4$, sequence length $1024$, and seed $42$.
 
 \begin{figure}[!ht]
     \centering
@@ -186,7 +182,7 @@ We choose "\texttt{base w128d16}" as the ConvPE variant configuration for perfor
         \label{fig:pretrain}
 \end{figure}
 
-Figure\ref{fig:pretrain} shows that ConvPE converge much farster and much better than the RoPE baseline.
+Figure\ref{fig:pretrain} shows that ConvPE converge farster and better than the RoPE baseline. We implement high-performance Flash MQA kernels in TileLang and benchmark two model configurations: \texttt{base RoPE} with $124.84$M parameters and \texttt{base w128d16} with $128.13$M parameters ($+2.64\%$), using a batch size of $4$ and a sequence length of $1024$. The forward-pass time increases by $2.70\%$, slightly exceeding the relative increase in parameter count, while the final training loss decreases from $3.2$ to $3.1$ ($-3.125\%$). According to scaling laws~\cite{kaplan2020scaling,hoffmann2022training}, such a substantial loss reduction would require increasing the model size to approximately $200$M parameters ($+60\%$). In addition, although the wall-clock training time increases by about $5\%$, the number of training tokens required to reach the final loss of RoPE baseline decreases from $3$B to about $2.34$B ($-22\%$).
 
 \subsection{2D Position Embedding}
 
@@ -217,9 +213,7 @@ Table~\ref{tab:cifar} shows that ConvPE transfers effectively to vision transfor
     \end{minipage}
 \end{table}
 
-\subsection{Kernel Optimization}
 
-We develop high-performance Flash MQA kernels implemented in TileLang. We benchmark base-model configurations \texttt{base rope} with $124.84$M parameters and \texttt{base w128d16} with $128.13$M parameters ($+2.64\%$) using batch size $4$ and sequence length $1024$. The forward-pass time increases by $2.70\%$, slightly higher than the parameter-count increase. The training time increases by about $7\%$, while convergence, measured by the reduction in training loss, is accelerated by about $1.8\times$.
 
 \section{Conclusions and Future Work}
 
