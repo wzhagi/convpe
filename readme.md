@@ -31,6 +31,7 @@ ConvPE (Convolutional Position Embedding) substantially improves both the perfor
 ## Context Extension Evaluations
 #### Note that ConvPE Window Size is 128.
 
+#### RULER Tasks
 | Task | Context | RoPE baseline | ConvPE w128d16 |
 |:---:|:---:|:---:|:---:|
 | niah_single_1 | 1K | 0.614 | 0.890 |
@@ -42,6 +43,10 @@ ConvPE (Convolutional Position Embedding) substantially improves both the perfor
 | niah_single_3 | 1K | 0.090 | 0.180 |
 | niah_single_3 | 2K | 0.000 | 0.014 |
 | niah_single_3 | 4K | 0.000 | 0.000 |
+| niah_multikey_1 | 1K | 0.198 | 0.200 |
+| niah_multikey_1 | 2K | 0.118 | 0.194 |
+| niah_multiquery | 1K | 0.104 | 0.186 |
+| niah_multiquery | 2K | 0.029 | 0.179 |
 | ruler_qa_squad | 1K | 0.148 | 0.191 |
 | ruler_qa_squad | 2K | 0.078 | 0.091 |
 
