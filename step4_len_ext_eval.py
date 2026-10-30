@@ -125,8 +125,9 @@ def download_punkt_tab(force: bool = False) -> None:
     for url in urls:
         print(f"downloading: {url}")
         try:
-            with urllib.request.urlopen(url, context=ctx, timeout=60) as resp, \
-                    open(zip_path, "wb") as f:
+            with urllib.request.urlopen(url, context=ctx, timeout=60) as resp, open(
+                zip_path, "wb"
+            ) as f:
                 shutil.copyfileobj(resp, f)
             print(f"downloaded -> {zip_path} ({zip_path.stat().st_size} bytes)")
             break
@@ -161,9 +162,7 @@ def download_punkt_tab(force: bool = False) -> None:
         print("解压后目录内容:")
         for p in sorted(punkt_tab_dir.rglob("*"))[:30]:
             print("  ", p)
-        raise RuntimeError(
-            "punkt_tab 解压后仍无法加载。"
-        )
+        raise RuntimeError("punkt_tab 解压后仍无法加载。")
     print("punkt_tab 安装并验证成功")
 
 
@@ -171,4 +170,3 @@ if __name__ == "__main__":
     download_punkt_tab()
     for task in TASKS:
         main(task, [task])
-

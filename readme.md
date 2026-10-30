@@ -29,7 +29,13 @@ ConvPE (Convolutional Position Embedding) substantially improves both the perfor
 | truthfulqa_mc1 | acc | 0.2399 | 0.2375 |**0.25**|
 
 ## Context Extension Evaluations
-#### Note that ConvPE Window Size is 128.
+#### FineWeb-Edu-10BT Validation Loss of 1M Tokens
+|Context| RoPE baseline | ConvPE w128d16 |
+|:---:|:---:|:---:|
+|1K|3.1247|**3.0312**|
+|2K|3.1684|**3.0021**|
+|4K|4.2690|**3.0278**|
+|8K|5.6443|**3.3575**|
 
 #### RULER Tasks
 | Task | Context | RoPE baseline | ConvPE w128d16 |
@@ -39,17 +45,13 @@ ConvPE (Convolutional Position Embedding) substantially improves both the perfor
 |                 | 4K | 0.000 | **0.314** |
 | niah_single_2   | 1K | 0.612 | **0.664** |
 |                 | 2K | 0.000 | **0.038** |
-|                 | 4K | 0.000 | 0.000 |
 | niah_single_3   | 1K | 0.090 | **0.180** |
 |                 | 2K | 0.000 | **0.014** |
-|                 | 4K | 0.000 | 0.000 |
 | niah_multikey_1 | 1K | 0.198 | **0.200** |
 |                 | 2K | 0.118 | **0.194** |
-|                 | 4K | 0.000 | **0.002** |
-| niah_multikey_2 | 1K | **0.002** | 0.000 |
-|                 | 2K | 0.000 | 0.000 |
-| niah_multikey_3 | 1K | 0.000 | **0.008** |
-|                 | 2K | 0.000 | 0.000 |
+|                 | 4K | 0.000 | 0.002 |
+| niah_multikey_2 | 1K | 0.002 | 0.000 |
+| niah_multikey_3 | 1K | 0.000 | 0.008 |
 | niah_multiquery | 1K | 0.104 | **0.186**|
 |                 | 2K | 0.029 | **0.179** |
 |                 | 4K | 0.000 | 0.000 |
@@ -60,9 +62,7 @@ ConvPE (Convolutional Position Embedding) substantially improves both the perfor
 |                 | 2K | 0.000 | **0.052** |
 |                 | 4K | 0.000 | **0.107** |
 | ruler_cwe       | 1K | 0.002 | 0.002 |
-|                 | 2K | 0.000 | **0.002** |
-| ruler_fwe       | 1K | 0.001 | **0.012** |
-|                 | 2K | 0.000 | **0.001** |
+| ruler_fwe       | 1K | 0.001 | 0.012 |
 | ruler_qa_squad  | 1K | 0.148 | **0.191** |
 |                 | 2K | 0.078 | **0.091** |
 |                 | 4K | 0.017 | **0.052** |
