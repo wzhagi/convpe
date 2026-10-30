@@ -6,7 +6,7 @@
   "errors": "replace",
   "is_local": false,
   "local_files_only": false,
-  "model_max_length": 1024,
+  "model_max_length": 5120,
   "pad_token": "<|endoftext|>",
   "tokenizer_class": "GPT2Tokenizer",
   "unk_token": "<|endoftext|>"

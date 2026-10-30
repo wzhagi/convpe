@@ -190,19 +190,12 @@ We choose "\texttt{base w128d16}" as the ConvPE variant configuration for perfor
         \label{fig:pretrain}
 \end{figure}
 
-Figure~\ref{fig:pretrain} shows that ConvPE converges faster and to a lower
-loss than the RoPE baseline. We implement high-performance Flash MQA kernels
-in TileLang and benchmark two model configurations: \texttt{base RoPE} with
+Figure~\ref{fig:pretrain} shows that ConvPE converges faster and achieves a lower final loss compared to the RoPE baseline. We implement high-performance Flash MQA kernels
+in TileLang and benchmark two configurations: \texttt{base RoPE} with
 $124.84$M parameters and \texttt{base w128d16} with $128.13$M parameters
-($+2.64\%$), using a batch size of $4$ and a sequence length of $1024$. The
-forward-pass time increases by $2.70\%$, slightly exceeding the relative
-increase in parameter count, while the final training loss decreases from
-$3.1195$ to $3.0316$ ($-0.0879$, $-2.82\%$). According to scaling
-laws~\cite{kaplan2020scaling,hoffmann2022training}, such a substantial loss
-reduction would require about $50\%$ more parameters. Moreover, although the
-wall-clock training time increases by about $7\%$, the number of training
-tokens required to match the final loss of the RoPE baseline decreases from
-$3$B to $2.06$B, a $31.3\%$ reduction.
+($+2.64\%$), using a batch size of $4$ and a sequence length of $1024$. While the
+forward-pass time increases by $2.70\%$, slightly exceeding the parameter increase, and the overall wall-clock time per step increases by approximately 7\%, the final training loss drops from
+$3.1195$ to $3.0316$ ($-2.82\%$). According to scaling laws~\cite{kaplan2020scaling,hoffmann2022training}, such a substantial loss reduction would typically require a model with $\sim 50\%$ more parameters. More importantly, despite the $7\%$ per-step overhead, the number of training tokens required to match the RoPE baseline's final loss decreases from $3$B to $2.06$B, a $31.3\%$ reduction. This translates to a net reduction in total wall-clock training time of approximately $26.5\%$.
 
 \subsection{2D Position Embedding}
 

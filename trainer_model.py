@@ -3,7 +3,10 @@ import torch.nn.functional as F
 from transformers import (
     PreTrainedModel,
     PretrainedConfig,
+    GenerationMixin,
+    GenerationConfig,
 )
+from transformers.cache_utils import DynamicCache
 from transformers.modeling_outputs import CausalLMOutputWithPast
 from transformer_convpe import *
 
@@ -13,10 +16,13 @@ class LanguageModelConfig(PretrainedConfig):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self.num_hidden_layers = self.num_layers
+        self.hidden_size = self.dim_model
         self.tie_word_embeddings = True
+        self.is_encoder_decoder = False
 
 
-class LanguageModel(PreTrainedModel):
+class LanguageModel(PreTrainedModel,GenerationMixin):
 
     config_class = LanguageModelConfig
     _tied_weights_keys = {"lm_head.weight": "tok_emb.weight"}
@@ -47,10 +53,20 @@ class LanguageModel(PreTrainedModel):
         self.post_init()
 
     def forward(
-        self, input_ids, labels=None, attention_mask=None
+        self,
+        input_ids,
+        labels=None,
+        attention_mask=None,
+        past_key_values=None,
+        use_cache=False,
+        return_dict=True,
     ) -> CausalLMOutputWithPast:
+        if isinstance(past_key_values, DynamicCache):
+            past_key_values = None
         x = self.tok_emb(input_ids)
-        x = self.transformer(x)
+        x, current_key_values = self.transformer(
+            x, attention_mask, past_key_values, use_cache
+        )
         logits = self.lm_head(x)
         loss = None
         if labels is not None:
@@ -58,4 +74,6 @@ class LanguageModel(PreTrainedModel):
                 logits[..., :-1, :].reshape(-1, logits.size(-1)),
                 labels[..., 1:].reshape(-1),
             )
-        return CausalLMOutputWithPast(loss, logits)
+        return CausalLMOutputWithPast(
+            loss, logits, current_key_values if use_cache else None
+        )

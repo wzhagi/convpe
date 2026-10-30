@@ -1,0 +1,13 @@
+{
+  "niah_single_1": {
+    "name": "niah_single_1",
+    "alias": "niah_single_1",
+    "sample_len": 1500,
+    "4096,none": 0.0,
+    "4096_stderr,none": "N/A",
+    "1024,none": 0.614,
+    "1024_stderr,none": 0.021793529219281196,
+    "2048,none": 0.004,
+    "2048_stderr,none": 0.002825591608118863
+  }
+}

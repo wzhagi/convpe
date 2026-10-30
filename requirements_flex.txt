@@ -2,5 +2,5 @@ torch
 torchvision
 transformers[torch]
 datasets
-lm_eval
+lm_eval["ruler"]
 matplotlib

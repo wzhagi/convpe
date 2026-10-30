@@ -42,10 +42,16 @@ class ConvPE(nn.Module):
             self.convd = nn.Linear(in_dim, rank, bias=False)
             self.convu = nn.Linear(rank, self.kernel_out * groups)
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, x: Tensor, sbcache: Tensor = None, use_cache=False) -> Tensor:
         b, s, _ = x.shape
         w, g, ki, ko = self.window_size, self.groups, self.kernel_in, self.kernel_out
-        xu = F.pad(self.proj(x), (0, 0, w - 1, 0)).unfold(1, w, 1).view(b, s, g, ki, w)
+        xd_current = self.proj(x)
+        if sbcache is not None:
+            xd = torch.cat([sbcache, xd_current], dim=1)
+        else:
+            xd = F.pad(xd_current, (0, 0, w - 1, 0))
+        new_sbcache = xd[:, -(w - 1) :, :] if use_cache else None
+        xu = xd.unfold(1, w, 1).view(b, s, g, ki, w)
         if self.rank == 0:
             if self.num_kernels == 1:
                 cw = self.conv.weight.view(ko, ki, w)
@@ -55,11 +61,10 @@ class ConvPE(nn.Module):
                 cw = self.conv.weight.view(g, ko, ki, w)
                 o = torch.einsum("bsgcw,gocw->bsgo", xu, cw)
                 o = o + self.conv.bias.view(1, 1, g, ko)
-            return o.reshape(b, s, self.heads, w)
         else:
             dw = self.convd.weight.view(self.rank, ki, w)
             tmp = torch.einsum("bsgcw,rcw->bsgr", xu, dw)
             uw = self.convu.weight.view(g, ko, self.rank)
             o = torch.einsum("bsgr,gor->bsgo", tmp, uw)
             o = o + self.convu.bias.view(1, 1, g, ko)
-            return o.reshape(b, s, self.heads, w)
+        return o.reshape(b, s, self.heads, w), new_sbcache

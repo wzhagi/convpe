@@ -1,12 +1,7 @@
 # ConvPE
 卷积位置编码（ConvPE）显著改善了 Transformer 的性能与样本效率。相比基线模型，ConvPE 仅增加 2.64% 的参数和 2.70% 的前向推理时间，却将训练损失降低 2.82%。达到基线最终训练损失所需的 token 仅为基线的 68.7%，且在本文评测的多数任务上优于基线。
 
-ConvPE (Convolutional Position Embedding) substantially improves both the
-performance and sample efficiency of Transformer models. At the cost of only
-2.64\% more parameters and a 2.70\% increase in forward-pass time, it achieves
-a 2.82\% reduction in training loss and substantial improvements on most
-evaluation benchmarks. It also requires only 68.7\% of the training tokens
-needed by the baseline to reach the baseline's final training loss.
+ConvPE (Convolutional Position Embedding) substantially improves both the performance and sample efficiency of Transformer models. At the cost of only 2.64\% more parameters and a 2.70\% increase in forward-pass time, it achieves a 2.82\% reduction in training loss and substantial improvements on most evaluation benchmarks. It also requires only 68.7\% of the training tokens needed by the baseline to reach the baseline's final training loss.
 
 | ![convpe](/paper/FIGURES/convpe.jpeg) | ![score_bias](/paper/FIGURES/score_bias.jpeg) |
 |---|---|
@@ -17,21 +12,39 @@ needed by the baseline to reach the baseline's final training loss.
 
 ## Pretraining Evaluations
 
-| Dataset | Metric | base_rope_42 | base_nope_w128d16r0h1g1_42 | Random |
+| Dataset | Metric | RoPE | ConvPE | Random |
 |:---:|:---:|:---:|:---:|:---:|
-| wikitext | perplexity | 46.5636 | **42.0498(-4.5138)** |-|
-| lambada_openai | perplexity | 118.1028 | **88.4866(-29.6162)** |-|
-| lambada_openai | acc | 0.2507 | **0.2604(+0.0097)** |0|
-| hellaswag | acc | 0.2894 | **0.2949(+0.0055)** |0.25|
-| hellaswag | acc_norm | 0.3148 | **0.3272(+0.0124)** |0.25|
-| xstorycloze_en | acc | 0.5460 | **0.5526(+0.0066)** |0.5|
-| piqa | acc | 0.6251 | **0.6338(+0.0087)** |0.5|
-| piqa | acc_norm | 0.6208 | **0.6235(+0.0027)**|0.5|
-| arc_easy | acc | 0.5114 | **0.5421(+0.0307)** |0.25|
-| arc_easy | acc_norm | 0.4487 | **0.4701(+0.0215)** |0.25|
-| winogrande | acc | 0.5091 | **0.5193(+0.0103)** |0.5|
-| boolq | acc | 0.5676 | **0.5893(+0.0217)** |0.5|
-| truthfulqa_mc1 | acc | 0.2399 | 0.2375(-0.0024) |**0.25**|
+| wikitext | perplexity | 46.5636 | **42.0498** |-|
+| lambada | perplexity | 118.1028 | **88.4866** |-|
+| lambada | acc | 0.2507 | **0.2604** |0|
+| hellaswag | acc | 0.2894 | **0.2949** |0.25|
+| hellaswag | acc_norm | 0.3148 | **0.3272** |0.25|
+| xstorycloze_en | acc | 0.5460 | **0.5526** |0.5|
+| piqa | acc | 0.6251 | **0.6338** |0.5|
+| piqa | acc_norm | 0.6208 | **0.6235**|0.5|
+| arc_easy | acc | 0.5114 | **0.5421** |0.25|
+| arc_easy | acc_norm | 0.4487 | **0.4701** |0.25|
+| winogrande | acc | 0.5091 | **0.5193** |0.5|
+| boolq | acc | 0.5676 | **0.5893** |0.5|
+| truthfulqa_mc1 | acc | 0.2399 | 0.2375 |**0.25**|
+
+## Context Extension Evaluations
+#### Note that ConvPE Window Size is 128.
+
+| Task | Context | RoPE baseline | ConvPE w128d16 |
+|:---:|:---:|:---:|:---:|
+| niah_single_1 | 1K | 0.614 | 0.890 |
+| niah_single_1 | 2K | 0.004 | 0.722 |
+| niah_single_1 | 4K | 0.000 | 0.314 |
+| niah_single_2 | 1K | 0.612 | 0.664 |
+| niah_single_2 | 2K | 0.000 | 0.038 |
+| niah_single_2 | 4K | 0.000 | 0.000 |
+| niah_single_3 | 1K | 0.090 | 0.180 |
+| niah_single_3 | 2K | 0.000 | 0.014 |
+| niah_single_3 | 4K | 0.000 | 0.000 |
+| ruler_qa_squad | 1K | 0.148 | 0.191 |
+| ruler_qa_squad | 2K | 0.078 | 0.091 |
+
 
 ## ConvPE2D validation accuracy on CIFAR-10, CIFAR-100.
 |model|CIFAR-10 valid acc|CIFAR-100 valid acc|
@@ -99,3 +112,10 @@ https://www.modelscope.cn/datasets/AI-ModelScope/fineweb-edu/tree/master/sample/
     python3 step3_pretrain_eval.py
 
 #### Run step3_plot.ipynb to see results.
+
+### 4. Context Length Extension
+
+    python3 step4_len_ext_eval.py
+
+
+

@@ -1,0 +1,13 @@
+{
+  "ruler_qa_squad": {
+    "name": "ruler_qa_squad",
+    "alias": "ruler_qa_squad",
+    "sample_len": 1000,
+    "4096,none": -1,
+    "4096_stderr,none": "N/A",
+    "1024,none": 0.19083333333333335,
+    "1024_stderr,none": 0.017081469748622385,
+    "2048,none": 0.09133333333333332,
+    "2048_stderr,none": 0.012546275953558008
+  }
+}

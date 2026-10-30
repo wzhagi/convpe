@@ -1,0 +1,13 @@
+{
+  "niah_multiquery": {
+    "name": "niah_multiquery",
+    "alias": "niah_multiquery",
+    "sample_len": 1000,
+    "4096,none": -1,
+    "4096_stderr,none": "N/A",
+    "1024,none": 0.186,
+    "1024_stderr,none": 0.004935252113808747,
+    "2048,none": 0.179,
+    "2048_stderr,none": 0.005046675923392694
+  }
+}

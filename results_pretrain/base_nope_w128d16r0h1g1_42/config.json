@@ -14,7 +14,7 @@
   "dim_rope": 0,
   "dtype": "float32",
   "eos_token_id": 50256,
-  "max_seq_len": 1024,
+  "max_seq_len": 5120,
   "model_type": "language_model",
   "name": "base_nope_w128d16r0h1g1",
   "num_heads": 12,

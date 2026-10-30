@@ -1,8 +1,10 @@
+from typing import Optional, Tuple
 import torch
 from torch import Tensor, nn
 from torch.nn import functional as F
 from convpe_exp import ConvPE
-from attn_tilelang import convpe_attention as attention
+from attn_tilelang2 import convpe_attention as attention
+
 # from attn_tilelang_fix_seq_len import convpe_attention as attention
 # from attn_flex import convpe_attention as attention
 
@@ -61,11 +63,29 @@ class Transformer(nn.Module):
         )
         self.post_norm = nn.RMSNorm(dim_model)
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(
+        self,
+        x: Tensor,
+        mask: Optional[Tensor] = None,
+        past_key_values: Optional[Tuple] = None,
+        use_cache: bool = False,
+    ) -> Tuple[Tensor, Optional[Tuple]]:
+        current_key_values = [] if use_cache else None
         for l in range(len(self.attns)):
-            x = x + self.attns[l](x)
+            if past_key_values is not None:
+                kvcache, sbcache = past_key_values[l]
+            else:
+                kvcache, sbcache = None, None
+            attn_out, new_kvcache, new_sbcache = self.attns[l](
+                x, mask=mask, kvcache=kvcache, sbcache=sbcache, use_cache=use_cache
+            )
+            x = x + attn_out
             x = x + self.ffns[l](x)
-        return self.post_norm(x)
+            if use_cache:
+                current_key_values.append((new_kvcache, new_sbcache))
+        x = self.post_norm(x)
+        current_key_values = tuple(current_key_values) if use_cache else None
+        return x, current_key_values
 
 
 class GatedFeedForward(nn.Module):
@@ -107,20 +127,37 @@ class MultiQueryAttention(nn.Module):
         self.kv_norm = nn.RMSNorm(dim_head)
         self.wo = nn.Linear(num_heads * dim_head, dim_model)
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(
+        self,
+        x: Tensor,
+        mask: Optional[Tensor] = None,
+        kvcache: Optional[Tensor] = None,
+        sbcache: Optional[Tensor] = None,
+        use_cache: bool = False,
+    ) -> Tuple[Tensor, Optional[Tensor]]:
         # x: (b,s,d) q: (b,s,h,d) kv:(b,s,1,d) o:(b,s,h,d)
+        if kvcache is not None:
+            pos = kvcache.size(1)
+        else:
+            pos = 0
         x = self.pre_norm(x)
         q = self.wq(x).unflatten(-1, (self.num_heads, -1))
         q = F.normalize(q, dim=-1)
         kv = self.kv_norm(self.wkv(x)).unsqueeze(-2)
         if self.rope is not None:
-            q = self.rope(q)
-            kv = self.rope(kv)
-        score_bias = None if self.convpe is None else self.convpe(x)
+            q = self.rope(q, pos=pos)
+            kv = self.rope(kv, pos=pos)
+        if kvcache is not None:
+            kv = torch.cat([kvcache, kv], dim=1)
+        new_kvcache = kv if use_cache else None
+        if self.convpe is None:
+            score_bias, new_sbcache = None, None
+        else:
+            score_bias, new_sbcache = self.convpe(x, sbcache, use_cache)
         o = attention(q, kv, self.sink, score_bias)
         if self.rope is not None:
-            o = self.rope(o, inverse=True)
-        return self.wo(o.flatten(-2))
+            o = self.rope(o, pos=pos, inverse=True)
+        return self.wo(o.flatten(-2)), new_kvcache, new_sbcache
 
 
 class RotaryPositionalEmbedding(nn.Module):
