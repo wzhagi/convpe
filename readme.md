@@ -34,9 +34,6 @@ ConvPE (Convolutional Position Embedding) substantially improves both the perfor
 #### RULER Tasks
 | Task | Context | RoPE baseline | ConvPE w128d16 |
 |:---:|:---:|:---:|:---:|
-
-| Task | Context | base_rope_42 | base_nope_w128d16r0h1g1_42 |
-|:---:|:---:|:---:|:---:|
 | niah_single_1   | 1K | 0.614 | **0.890** |
 |                 | 2K | 0.004 | **0.722** |
 |                 | 4K | 0.000 | **0.314** |
