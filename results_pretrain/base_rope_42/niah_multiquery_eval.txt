@@ -3,7 +3,7 @@
     "name": "niah_multiquery",
     "alias": "niah_multiquery",
     "sample_len": 1000,
-    "4096,none": -1,
+    "4096,none": 0.0,
     "4096_stderr,none": "N/A",
     "1024,none": 0.1045,
     "1024_stderr,none": 0.005520003703057048,

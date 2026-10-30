@@ -3,7 +3,7 @@
     "name": "ruler_qa_squad",
     "alias": "ruler_qa_squad",
     "sample_len": 1000,
-    "4096,none": -1,
+    "4096,none": 0.016666666666666666,
     "4096_stderr,none": "N/A",
     "1024,none": 0.148,
     "1024_stderr,none": 0.01543450691025408,

@@ -1,0 +1,13 @@
+{
+  "ruler_fwe": {
+    "name": "ruler_fwe",
+    "alias": "ruler_fwe",
+    "sample_len": 1000,
+    "4096,none": -1,
+    "4096_stderr,none": "N/A",
+    "1024,none": 0.012,
+    "1024_stderr,none": 0.0027798300145547815,
+    "2048,none": 0.0013333333333333333,
+    "2048_stderr,none": 0.0009418638693729542
+  }
+}

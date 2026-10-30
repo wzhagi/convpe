@@ -1,0 +1,13 @@
+{
+  "ruler_cwe": {
+    "name": "ruler_cwe",
+    "alias": "ruler_cwe",
+    "sample_len": 1000,
+    "4096,none": -1,
+    "4096_stderr,none": "N/A",
+    "1024,none": 0.0022,
+    "1024_stderr,none": 0.0006566447781940088,
+    "2048,none": 0.0018,
+    "2048_stderr,none": 0.0005951709476392709
+  }
+}

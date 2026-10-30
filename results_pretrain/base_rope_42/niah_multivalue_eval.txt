@@ -1,0 +1,13 @@
+{
+  "niah_multivalue": {
+    "name": "niah_multivalue",
+    "alias": "niah_multivalue",
+    "sample_len": 1000,
+    "4096,none": 0.0,
+    "4096_stderr,none": "N/A",
+    "1024,none": 0.149,
+    "1024_stderr,none": 0.005491658823458221,
+    "2048,none": 0.1265,
+    "2048_stderr,none": 0.005595365603109856
+  }
+}

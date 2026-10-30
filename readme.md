@@ -12,7 +12,7 @@ ConvPE (Convolutional Position Embedding) substantially improves both the perfor
 
 ## Pretraining Evaluations
 
-| Dataset | Metric | RoPE | ConvPE | Random |
+| Dataset | Metric | RoPE baseline | ConvPE w128d16 | Random |
 |:---:|:---:|:---:|:---:|:---:|
 | wikitext | perplexity | 46.5636 | **42.0498** |-|
 | lambada | perplexity | 118.1028 | **88.4866** |-|
@@ -34,21 +34,41 @@ ConvPE (Convolutional Position Embedding) substantially improves both the perfor
 #### RULER Tasks
 | Task | Context | RoPE baseline | ConvPE w128d16 |
 |:---:|:---:|:---:|:---:|
-| niah_single_1 | 1K | 0.614 | 0.890 |
-| niah_single_1 | 2K | 0.004 | 0.722 |
-| niah_single_1 | 4K | 0.000 | 0.314 |
-| niah_single_2 | 1K | 0.612 | 0.664 |
-| niah_single_2 | 2K | 0.000 | 0.038 |
-| niah_single_2 | 4K | 0.000 | 0.000 |
-| niah_single_3 | 1K | 0.090 | 0.180 |
-| niah_single_3 | 2K | 0.000 | 0.014 |
-| niah_single_3 | 4K | 0.000 | 0.000 |
-| niah_multikey_1 | 1K | 0.198 | 0.200 |
-| niah_multikey_1 | 2K | 0.118 | 0.194 |
-| niah_multiquery | 1K | 0.104 | 0.186 |
-| niah_multiquery | 2K | 0.029 | 0.179 |
-| ruler_qa_squad | 1K | 0.148 | 0.191 |
-| ruler_qa_squad | 2K | 0.078 | 0.091 |
+
+| Task | Context | base_rope_42 | base_nope_w128d16r0h1g1_42 |
+|:---:|:---:|:---:|:---:|
+| niah_single_1   | 1K | 0.614 | **0.890** |
+|                 | 2K | 0.004 | **0.722** |
+|                 | 4K | 0.000 | **0.314** |
+| niah_single_2   | 1K | 0.612 | **0.664** |
+|                 | 2K | 0.000 | **0.038** |
+|                 | 4K | 0.000 | 0.000 |
+| niah_single_3   | 1K | 0.090 | **0.180** |
+|                 | 2K | 0.000 | **0.014** |
+|                 | 4K | 0.000 | 0.000 |
+| niah_multikey_1 | 1K | 0.198 | **0.200** |
+|                 | 2K | 0.118 | **0.194** |
+|                 | 4K | 0.000 | **0.002** |
+| niah_multikey_2 | 1K | **0.002** | 0.000 |
+|                 | 2K | 0.000 | 0.000 |
+| niah_multikey_3 | 1K | 0.000 | **0.008** |
+|                 | 2K | 0.000 | 0.000 |
+| niah_multiquery | 1K | 0.104 | **0.186**|
+|                 | 2K | 0.029 | **0.179** |
+|                 | 4K | 0.000 | 0.000 |
+| niah_multivalue | 1K | 0.149 | **0.187** |
+|                 | 2K | 0.127 | **0.186** |
+|                 | 4K | 0.000 | 0.000 |
+| ruler_vt        | 1K | **0.032** | 0.008 |
+|                 | 2K | 0.000 | **0.052** |
+|                 | 4K | 0.000 | **0.107** |
+| ruler_cwe       | 1K | 0.002 | 0.002 |
+|                 | 2K | 0.000 | **0.002** |
+| ruler_fwe       | 1K | 0.001 | **0.012** |
+|                 | 2K | 0.000 | **0.001** |
+| ruler_qa_squad  | 1K | 0.148 | **0.191** |
+|                 | 2K | 0.078 | **0.091** |
+|                 | 4K | 0.017 | **0.052** |
 
 
 ## ConvPE2D validation accuracy on CIFAR-10, CIFAR-100.
