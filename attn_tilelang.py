@@ -17,14 +17,20 @@ def convpe_attention(
 ) -> torch.Tensor:
     """FlashAttention with banded score bias (per bias-head, GQA style) and sink.
 
+    Supports kvcache semantics: ``q`` may be shorter than ``kv``. When ``q``
+    length is 1 (single decoding step), causal masking is automatically a no-op
+    because all KV positions are at or before the query's absolute position.
+
     Args:
-        q: Query tensor, shape ``(B, T, H, D)``.
-        kv: Key (also used as Value), shape ``(B, T, H_kv, D)``.
-        score_bias: Optional banded bias, shape ``(B, T, H_b, W)``.
+        q: Query tensor, shape ``(B, T_q, H, D)``.
+        kv: Key (also used as Value), shape ``(B, T_kv, H_kv, D)``.
+        score_bias: Optional banded bias, shape ``(B, T_q, H_b, W)``.
             ``H_b`` must divide ``H``; head ``h`` uses bias-head ``h // (H // H_b)``.
-            ``None`` = no bias.
+            The window is relative to the *absolute* position:
+            ``w_idx = (T_kv - T_q + q_idx) - k_idx``.
         sink: Optional attention-sink per head, shape ``(H,)``. ``None`` = no sink.
-        causal: If ``True`` (default), apply causal masking.
+        causal: If ``True`` (default), apply causal masking based on absolute
+            positions (q's absolute position is ``T_kv - T_q + q_idx``).
     """
     dtype_in = q.dtype
     q, kv = q.to(dtype), kv.to(dtype)
@@ -33,12 +39,17 @@ def convpe_attention(
             f"q and kv must be 4D (B, T, H, D), "
             f"got q.dim()={q.dim()}, kv.dim()={kv.dim()}"
         )
-    B, T, H, D = q.shape
-    B_k, T_k, H_kv, D_k = kv.shape
-    if (B, T, D) != (B_k, T_k, D_k):
+    B, T_q, H, D = q.shape
+    B_k, T_kv, H_kv, D_k = kv.shape
+    if (B, D) != (B_k, D_k):
         raise ValueError(
-            f"q and kv must match on (B, T, D), "
+            f"q and kv must match on (B, D), "
             f"got q.shape={tuple(q.shape)}, kv.shape={tuple(kv.shape)}"
+        )
+    if T_q > T_kv:
+        raise ValueError(
+            f"q seq length ({T_q}) must not exceed kv seq length ({T_kv}) "
+            f"under kvcache semantics"
         )
     if H % H_kv != 0:
         raise ValueError(f"H={H} must be divisible by H_kv={H_kv} (MQA/GQA)")
@@ -47,12 +58,12 @@ def convpe_attention(
     if score_bias is not None:
         if score_bias.dim() != 4:
             raise ValueError(
-                f"score_bias must be 4D (B, T, H_b, W), "
+                f"score_bias must be 4D (B, T_q, H_b, W), "
                 f"got shape={tuple(score_bias.shape)}"
             )
-        if score_bias.shape[:2] != (B, T):
+        if score_bias.shape[:2] != (B, T_q):
             raise ValueError(
-                f"score_bias must have shape (B={B}, T={T}, H_b, W), "
+                f"score_bias must have shape (B={B}, T_q={T_q}, H_b, W), "
                 f"got {tuple(score_bias.shape)}"
             )
         H_b = score_bias.shape[2]
@@ -78,20 +89,19 @@ def convpe_attention(
 
 
 # ============================================================
-# Forward：full causal + windowed bias（per bias-head）+ attention sink
+# Forward: full causal + windowed bias + sink, supporting KV cache
 #
 # ★ 关键改动：
-#   - 签名去掉 seq_len
-#   - 内部用 T.symbolic("SEQ_LEN", "int32") 声明动态维度
-#   - 所有 seq_len 用法替换为 SEQ_LEN（循环边界 / 掩码 / min 截断）
-#   - out_idx=[4, 5] 不变（Output 在位置 4，lse 在位置 5）
+#   - 三个动态符号：BATCH、Q_LEN（查询序列）、KV_LEN（KV 序列）
+#   - Q 的第 i 个 token 对应绝对位置 q_abs = (KV_LEN - Q_LEN) + i
+#   - causal mask 与 bias window 均基于绝对位置
+#   - Q_LEN=1 时 causal 天然恒真 → 无需显式 mask（自动满足）
 # ============================================================
 @tilelang.jit(
     out_idx=[4, 5],
     pass_configs={tilelang.PassConfigKey.TL_ENABLE_FAST_MATH: True},
 )
 def flashattn_fwd(
-    batch,
     heads,
     dim,
     is_causal,
@@ -107,12 +117,13 @@ def flashattn_fwd(
     sqrt_d_val = dim**0.5
     head_kv = heads // groups
     head_b = heads // groups_b
-    # ★ 动态序列长度
-    SEQ_LEN = T.symbolic("SEQ_LEN", "int32")
+    BATCH = T.dynamic("BATCH", "int32")
+    Q_LEN = T.dynamic("Q_LEN", "int32")
+    KV_LEN = T.dynamic("KV_LEN", "int32")
 
-    q_shape = [batch, SEQ_LEN, heads, dim]
-    k_shape = [batch, SEQ_LEN, head_kv, dim]
-    bias_shape = [batch, SEQ_LEN, head_b, W] if has_bias else [1, 1, 1, 1]
+    q_shape = [BATCH, Q_LEN, heads, dim]
+    k_shape = [BATCH, KV_LEN, head_kv, dim]
+    bias_shape = [BATCH, Q_LEN, head_b, W] if has_bias else [1, 1, 1, 1]
     accum_dtype = T.float32
 
     @T.prim_func
@@ -121,10 +132,10 @@ def flashattn_fwd(
         K: T.Tensor(k_shape, dtype),
         score_bias: T.Tensor(bias_shape, dtype),
         sink: T.Tensor([heads], accum_dtype),
-        Output: T.Tensor([batch, SEQ_LEN, heads, dim], dtype),
-        lse: T.Tensor([batch, heads, SEQ_LEN], accum_dtype),
+        Output: T.Tensor([BATCH, Q_LEN, heads, dim], dtype),
+        lse: T.Tensor([BATCH, heads, Q_LEN], accum_dtype),
     ):
-        with T.Kernel(T.ceildiv(SEQ_LEN, block_M), heads, batch, threads=256) as (
+        with T.Kernel(T.ceildiv(Q_LEN, block_M), heads, BATCH, threads=256) as (
             bx,
             by,
             bz,
@@ -142,12 +153,14 @@ def flashattn_fwd(
             scores_sum = T.alloc_fragment([block_M], accum_dtype)
             logsum = T.alloc_fragment([block_M], accum_dtype)
 
-            # ★ 预加载当前 query block 的 bias tile 到 shared
+            # 绝对位置偏移：Q block 中第 i 个 token 的绝对位置
+            q_offset = KV_LEN - Q_LEN
+
             if is_causal and has_bias:
                 bias_shared = T.alloc_shared([block_M, W], dtype)
                 for i, ww in T.Parallel(block_M, W):
                     q_idx = bx * block_M + i
-                    q_idx_c = T.min(q_idx, SEQ_LEN - 1)
+                    q_idx_c = T.min(q_idx, Q_LEN - 1)
                     bias_shared[i, ww] = score_bias[bz, q_idx_c, by // groups_b, ww]
 
             T.copy(Q[bz, bx * block_M : (bx + 1) * block_M, by, :], Q_shared)
@@ -156,11 +169,15 @@ def flashattn_fwd(
             T.fill(scores_max, -T.infinity(accum_dtype))
 
             if is_causal:
+                # K 循环上界：min(覆盖到最大 q_abs 的 block, KV 长度)
                 loop_start = 0
-                loop_end = T.ceildiv((bx + 1) * block_M, block_N)
+                loop_end = T.min(
+                    T.ceildiv(q_offset + (bx + 1) * block_M, block_N),
+                    T.ceildiv(KV_LEN, block_N),
+                )
             else:
                 loop_start = 0
-                loop_end = T.ceildiv(SEQ_LEN, block_N)
+                loop_end = T.ceildiv(KV_LEN, block_N)
 
             for k in T.Pipelined(loop_start, loop_end, num_stages=num_stages):
                 T.copy(
@@ -168,16 +185,20 @@ def flashattn_fwd(
                     K_shared,
                 )
                 if is_causal:
+                    # causal 条件：q_abs >= k_abs（含 Q_LEN=1 时全为真的情况）
                     for i, j in T.Parallel(block_M, block_N):
+                        q_abs = q_offset + bx * block_M + i
+                        k_abs = k * block_N + j
+                        in_causal = (q_abs >= k_abs) and (k_abs < KV_LEN)
                         acc_s[i, j] = T.if_then_else(
-                            bx * block_M + i >= k * block_N + j,
+                            in_causal,
                             0,
                             -T.infinity(acc_s.dtype),
                         )
                 else:
                     for i, j in T.Parallel(block_M, block_N):
                         acc_s[i, j] = T.if_then_else(
-                            k * block_N + j >= SEQ_LEN,
+                            k * block_N + j >= KV_LEN,
                             -T.infinity(acc_s.dtype),
                             0,
                         )
@@ -190,11 +211,12 @@ def flashattn_fwd(
                 )
 
                 if is_causal and has_bias:
+                    # bias window 用绝对位置差
                     for i, j in T.Parallel(block_M, block_N):
-                        q_idx = bx * block_M + i
-                        k_idx = k * block_N + j
-                        w_idx = q_idx - k_idx
-                        in_window = (w_idx >= 0) and (w_idx < W)
+                        q_abs = q_offset + bx * block_M + i
+                        k_abs = k * block_N + j
+                        w_idx = q_abs - k_abs
+                        in_window = (w_idx >= 0) and (w_idx < W) and (k_abs < KV_LEN)
                         w_c = T.min(T.max(w_idx, 0), W - 1)
                         acc_s[i, j] = acc_s[i, j] + T.if_then_else(
                             in_window,
@@ -245,25 +267,26 @@ def flashattn_fwd(
 
 
 # ============================================================
-# Backward preprocess（seq_len 去掉，改为符号）
+# Backward preprocess（动态 BATCH + Q_LEN）
 # ============================================================
 @tilelang.jit(
     out_idx=[2],
     pass_configs={tilelang.PassConfigKey.TL_ENABLE_FAST_MATH: True},
 )
-def flashattn_bwd_preprocess(batch, heads, dim):
+def flashattn_bwd_preprocess(heads, dim):
     accum_dtype = T.float32
-    SEQ_LEN = T.symbolic("SEQ_LEN", "int32")
-    shape = [batch, SEQ_LEN, heads, dim]
+    BATCH = T.dynamic("BATCH", "int32")
+    Q_LEN = T.dynamic("Q_LEN", "int32")
+    shape = [BATCH, Q_LEN, heads, dim]
     blk = 32
 
     @T.prim_func
     def flash_bwd_prep(
         O: T.Tensor(shape, dtype),
         dO: T.Tensor(shape, dtype),
-        Delta: T.Tensor([batch, heads, SEQ_LEN], accum_dtype),
+        Delta: T.Tensor([BATCH, heads, Q_LEN], accum_dtype),
     ):
-        with T.Kernel(heads, T.ceildiv(SEQ_LEN, blk), batch) as (bx, by, bz):
+        with T.Kernel(heads, T.ceildiv(Q_LEN, blk), BATCH) as (bx, by, bz):
             o = T.alloc_fragment([blk, blk], dtype)
             do = T.alloc_fragment([blk, blk], dtype)
             acc = T.alloc_fragment([blk, blk], accum_dtype)
@@ -290,16 +313,17 @@ def make_dq_layout(dQ):
 
 
 # ============================================================
-# Backward postprocess（seq_len 去掉，改为符号）
+# Backward postprocess（动态 BATCH + Q_LEN）
 # ============================================================
 @tilelang.jit(
     out_idx=[1],
     pass_configs={tilelang.PassConfigKey.TL_ENABLE_FAST_MATH: True},
 )
-def flashattn_bwd_postprocess(batch, heads, dim):
+def flashattn_bwd_postprocess(heads, dim):
     accum_dtype = T.float32
-    SEQ_LEN = T.symbolic("SEQ_LEN", "int32")
-    shape = [batch, SEQ_LEN, heads, dim]
+    BATCH = T.dynamic("BATCH", "int32")
+    Q_LEN = T.dynamic("Q_LEN", "int32")
+    shape = [BATCH, Q_LEN, heads, dim]
     blk = 64
 
     @T.prim_func
@@ -307,7 +331,7 @@ def flashattn_bwd_postprocess(batch, heads, dim):
         dQ: T.Tensor(shape, accum_dtype),
         dQ_out: T.Tensor(shape, dtype),
     ):
-        with T.Kernel(T.ceildiv(SEQ_LEN, blk), heads, batch, threads=128) as (
+        with T.Kernel(T.ceildiv(Q_LEN, blk), heads, BATCH, threads=128) as (
             bx,
             by,
             bz,
@@ -322,11 +346,17 @@ def flashattn_bwd_postprocess(batch, heads, dim):
 
 
 # ============================================================
-# Backward main kernel（seq_len 去掉，改为符号）
+# Backward main kernel: supports KV cache
+#
+# ★ 改动：
+#   - 动态符号：BATCH / Q_LEN / KV_LEN
+#   - grid: ceildiv(KV_LEN, block_M)  → 外层 block 是 K 的 block
+#   - 内层 Q 循环：ceildiv(Q_LEN, block_N)
+#   - causal / bias 用绝对位置
+#   - dQ 输出 shape (B, Q_LEN, ...)，dK_full shape (B, KV_LEN, ...)
 # ============================================================
 @tilelang.jit(pass_configs={tilelang.PassConfigKey.TL_ENABLE_FAST_MATH: True})
 def flashattn_bwd_atomic_add(
-    batch,
     heads,
     dim,
     is_causal,
@@ -344,12 +374,15 @@ def flashattn_bwd_atomic_add(
     sqrt_d_val = dim**0.5
     head_kv = heads // groups
     head_b = heads // groups_b
-    SEQ_LEN = T.symbolic("SEQ_LEN", "int32")
+    BATCH = T.dynamic("BATCH", "int32")
+    Q_LEN = T.dynamic("Q_LEN", "int32")
+    KV_LEN = T.dynamic("KV_LEN", "int32")
 
-    q_shape = [batch, SEQ_LEN, heads, dim]
-    k_shape = [batch, SEQ_LEN, head_kv, dim]
-    bias_shape = [batch, SEQ_LEN, head_b, W] if has_bias else [1, 1, 1, 1]
-    dB_shape = [batch, SEQ_LEN, heads, W] if has_bias else [1, 1, 1, 1]
+    q_shape = [BATCH, Q_LEN, heads, dim]
+    k_shape = [BATCH, KV_LEN, head_kv, dim]
+    bias_shape = [BATCH, Q_LEN, head_b, W] if has_bias else [1, 1, 1, 1]
+    dB_shape = [BATCH, Q_LEN, heads, W] if has_bias else [1, 1, 1, 1]
+    dk_full_shape = [BATCH, KV_LEN, heads, dim]
     accum_dtype = T.float32
 
     @T.prim_func
@@ -358,15 +391,15 @@ def flashattn_bwd_atomic_add(
         K: T.Tensor(k_shape, dtype),
         score_bias: T.Tensor(bias_shape, dtype),
         sink: T.Tensor([heads], accum_dtype),
-        dO: T.Tensor([batch, SEQ_LEN, heads, dim], dtype),
-        lse: T.Tensor([batch, heads, SEQ_LEN], accum_dtype),
-        Delta: T.Tensor([batch, heads, SEQ_LEN], accum_dtype),
+        dO: T.Tensor([BATCH, Q_LEN, heads, dim], dtype),
+        lse: T.Tensor([BATCH, heads, Q_LEN], accum_dtype),
+        Delta: T.Tensor([BATCH, heads, Q_LEN], accum_dtype),
         dQ: T.Tensor(q_shape, accum_dtype),
-        dK_full: T.Tensor([batch, SEQ_LEN, heads, dim], accum_dtype),
+        dK_full: T.Tensor(dk_full_shape, accum_dtype),
         dB_full: T.Tensor(dB_shape, accum_dtype),
-        d_sink_bh: T.Tensor([batch, heads], accum_dtype),
+        d_sink_bh: T.Tensor([BATCH, heads], accum_dtype),
     ):
-        with T.Kernel(heads, T.ceildiv(SEQ_LEN, block_M), batch, threads=threads) as (
+        with T.Kernel(heads, T.ceildiv(KV_LEN, block_M), BATCH, threads=threads) as (
             bx,
             by,
             bz,
@@ -394,18 +427,23 @@ def flashattn_bwd_atomic_add(
             T.fill(sink_total, 0)
             sink2 = sink[bx] * LOG2E
 
+            q_offset = KV_LEN - Q_LEN
+
             T.annotate_layout({dQ: make_dq_layout(dQ)})
 
             T.copy(K[bz, by * block_M : (by + 1) * block_M, bx // groups, :], K_shared)
             T.clear(dv)
             T.clear(dk)
 
+            # 对内层 Q block 的循环边界
             if is_causal:
-                loop_st = T.floordiv(by * block_M, block_N)
-                loop_ed = T.ceildiv(SEQ_LEN, block_N)
+                # 只有 q_abs >= k_abs（min k_abs = by*block_M）才有贡献
+                #  => q_idx >= by*block_M - q_offset
+                loop_st = T.max(0, T.floordiv(by * block_M - q_offset, block_N))
+                loop_ed = T.ceildiv(Q_LEN, block_N)
             else:
                 loop_st = 0
-                loop_ed = T.ceildiv(SEQ_LEN, block_N)
+                loop_ed = T.ceildiv(Q_LEN, block_N)
 
             for k in T.Pipelined(loop_st, loop_ed, num_stages=num_stages):
                 T.copy(Q[bz, k * block_N : (k + 1) * block_N, bx, :], q)
@@ -419,13 +457,14 @@ def flashattn_bwd_atomic_add(
                     for i, j in T.Parallel(block_M, block_N):
                         q_idx = k * block_N + j
                         k_idx = by * block_M + i
-                        w_idx = q_idx - k_idx
+                        q_abs = q_offset + q_idx
+                        w_idx = q_abs - k_idx
                         in_causal = (
-                            (w_idx >= 0) and (q_idx < SEQ_LEN) and (k_idx < SEQ_LEN)
+                            (q_idx < Q_LEN) and (k_idx < KV_LEN) and (q_abs >= k_idx)
                         )
                         in_window = in_causal and (w_idx < W)
                         w_c = T.min(T.max(w_idx, 0), W - 1)
-                        q_idx_c = T.min(q_idx, SEQ_LEN - 1)
+                        q_idx_c = T.min(q_idx, Q_LEN - 1)
                         bias_val = T.if_then_else(
                             in_window,
                             T.cast(
@@ -444,10 +483,9 @@ def flashattn_bwd_atomic_add(
                     for i, j in T.Parallel(block_M, block_N):
                         q_idx = k * block_N + j
                         k_idx = by * block_M + i
+                        q_abs = q_offset + q_idx
                         in_causal = (
-                            (q_idx >= k_idx)
-                            and (q_idx < SEQ_LEN)
-                            and (k_idx < SEQ_LEN)
+                            (q_idx < Q_LEN) and (k_idx < KV_LEN) and (q_abs >= k_idx)
                         )
                         qkT[i, j] = T.if_then_else(
                             in_causal,
@@ -456,7 +494,13 @@ def flashattn_bwd_atomic_add(
                         )
                 else:
                     for i, j in T.Parallel(block_M, block_N):
-                        qkT[i, j] = T.exp2(qkT[i, j] * scale - lse_shared[j])
+                        q_idx = k * block_N + j
+                        in_causal = q_idx < Q_LEN
+                        qkT[i, j] = T.if_then_else(
+                            in_causal,
+                            T.exp2(qkT[i, j] * scale - lse_shared[j]),
+                            accum_dtype(0),
+                        )
 
                 T.copy(dO[bz, k * block_N : (k + 1) * block_N, bx, :], do)
                 T.clear(dsT)
@@ -471,7 +515,7 @@ def flashattn_bwd_atomic_add(
                 if by == 0:
                     for j in T.Parallel(block_N):
                         q_idx = k * block_N + j
-                        valid = q_idx < SEQ_LEN
+                        valid = q_idx < Q_LEN
                         p_sink = T.exp2(sink2 - lse_shared[j])
                         contrib = T.if_then_else(
                             valid, -p_sink * delta[j], T.float32(0)
@@ -482,9 +526,10 @@ def flashattn_bwd_atomic_add(
                     for i, j in T.Parallel(block_M, block_N):
                         q_idx = k * block_N + j
                         k_idx = by * block_M + i
-                        w_idx = q_idx - k_idx
+                        q_abs = q_offset + q_idx
+                        w_idx = q_abs - k_idx
                         in_causal = (
-                            (w_idx >= 0) and (q_idx < SEQ_LEN) and (k_idx < SEQ_LEN)
+                            (q_idx < Q_LEN) and (k_idx < KV_LEN) and (q_abs >= k_idx)
                         )
                         in_window = in_causal and (w_idx < W)
                         d_bias = qkT[i, j] * (dsT[i, j] - delta[j])
@@ -501,7 +546,9 @@ def flashattn_bwd_atomic_add(
                 T.clear(dq)
                 T.gemm(dsT_shared, K_shared, dq, transpose_A=True)
                 for i, j in T.Parallel(block_N, dim):
-                    T.atomic_add(dQ[bz, k * block_N + i, bx, j], dq[i, j])
+                    q_idx = k * block_N + i
+                    if q_idx < Q_LEN:
+                        T.atomic_add(dQ[bz, q_idx, bx, j], dq[i, j])
 
             if by == 0:
                 T.reduce_sum(sink_acc, sink_total, dim=0)
@@ -515,16 +562,15 @@ def flashattn_bwd_atomic_add(
 
 
 # ============================================================
-# Autograd wrapper
-# ★ 调用侧去掉 N_CTX（不再作为 jit 的编译期参数），
-#   主机侧分配 buffer 时仍按实际 N_CTX
+# Autograd wrapper (supports Q_LEN != KV_LEN, dynamic BATCH)
 # ============================================================
 @torch.compile
 class _attention(torch.autograd.Function):
     @staticmethod
     def forward(ctx, q, k, score_bias, sink, causal, groups=1):
-        BATCH, N_CTX, H, D_HEAD = q.shape
         ctx.causal = causal
+        ctx.groups = groups
+        BATCH, Q_LEN, H, D_HEAD = q.shape
 
         if score_bias is not None:
             H_b = score_bias.shape[2]
@@ -540,9 +586,7 @@ class _attention(torch.autograd.Function):
             sb_bf16 = None
 
         block_M, block_N = 128, 64
-        # ★ 不再传 N_CTX
         mod = flashattn_fwd(
-            BATCH,
             H,
             D_HEAD,
             causal,
@@ -565,8 +609,8 @@ class _attention(torch.autograd.Function):
     @staticmethod
     def backward(ctx, do):
         q, k, sb_bf16, sink, o, lse = ctx.saved_tensors
-        BATCH, N_CTX, H, D_HEAD = q.shape
-        HEAD_KV = k.shape[-2]
+        BATCH, Q_LEN, H, D_HEAD = q.shape
+        _, KV_LEN, HEAD_KV, _ = k.shape
         groups = H // HEAD_KV
 
         has_bias = sb_bf16 is not None
@@ -584,15 +628,12 @@ class _attention(torch.autograd.Function):
 
         do, q, k, o = [maybe_contiguous(x) for x in (do, q, k, o)]
 
-        # ★ 不再传 N_CTX
-        mod_prep = flashattn_bwd_preprocess(BATCH, H, D_HEAD)
-        mod_post = flashattn_bwd_postprocess(BATCH, H, D_HEAD)
+        mod_prep = flashattn_bwd_preprocess(H, D_HEAD)
+        mod_post = flashattn_bwd_postprocess(H, D_HEAD)
         delta = mod_prep(o, do)
 
         block_M, block_N = 128, 32
-        # ★ 不再传 N_CTX
         kernel = flashattn_bwd_atomic_add(
-            BATCH,
             H,
             D_HEAD,
             ctx.causal,
@@ -605,15 +646,14 @@ class _attention(torch.autograd.Function):
             W=W,
         )
 
-        shape_q = [BATCH, N_CTX, H, D_HEAD]
+        shape_q = [BATCH, Q_LEN, H, D_HEAD]
+        shape_kv = [BATCH, KV_LEN, H, D_HEAD]
         dq = torch.zeros(shape_q, dtype=torch.float32, device=q.device)
-        dk_full = torch.zeros(
-            [BATCH, N_CTX, H, D_HEAD], dtype=torch.float32, device=q.device
-        )
+        dk_full = torch.zeros(shape_kv, dtype=torch.float32, device=q.device)
 
         if has_bias:
             db_split = torch.zeros(
-                [BATCH, N_CTX, H, W], dtype=torch.float32, device=q.device
+                [BATCH, Q_LEN, H, W], dtype=torch.float32, device=q.device
             )
             sb_arg = sb_bf16
         else:
@@ -625,11 +665,11 @@ class _attention(torch.autograd.Function):
         d_sink = d_sink_bh.sum(dim=0)
 
         dq = mod_post(dq)
-        dk = dk_full.view(BATCH, N_CTX, HEAD_KV, groups, D_HEAD).sum(dim=3).to(dtype)
+        dk = dk_full.view(BATCH, KV_LEN, HEAD_KV, groups, D_HEAD).sum(dim=3).to(dtype)
 
         if has_bias:
             d_score_bias = (
-                db_split.view(BATCH, N_CTX, H_b, groups_b, W)
+                db_split.view(BATCH, Q_LEN, H_b, groups_b, W)
                 .sum(dim=3)
                 .to(dtype)
                 .to(ctx.score_bias_orig_dtype)
@@ -641,16 +681,21 @@ class _attention(torch.autograd.Function):
 
 
 # ============================================================
-# Reference
+# Reference (supports Q_LEN != KV_LEN)
 # ============================================================
 def ref_program(Q, K, sink, score_bias, is_causal):
-    B, T, HQ, D = Q.shape
+    B, T_q, HQ, D = Q.shape
+    _, T_kv, _, _ = K.shape
     q = Q.transpose(1, 2)
     k = K.transpose(1, 2)
 
+    Q_OFFSET = T_kv - T_q
+    q_idx = torch.arange(T_q, device=Q.device)
+    k_idx = torch.arange(T_kv, device=Q.device)
+    q_abs = Q_OFFSET + q_idx
+    w_idx = q_abs.unsqueeze(1) - k_idx.unsqueeze(0)  # (T_q, T_kv)
+
     if is_causal:
-        idx = torch.arange(T, device=Q.device)
-        w_idx = idx.unsqueeze(1) - idx.unsqueeze(0)
         causal_ok = w_idx >= 0
 
         if score_bias is not None:
@@ -662,21 +707,21 @@ def ref_program(Q, K, sink, score_bias, is_causal):
             w_c = w_idx.clamp(0, W - 1)
 
             sb_hq = score_bias.repeat_interleave(groups_b, dim=2)
-            w_c_exp = w_c.view(1, T, 1, T).expand(B, T, HQ, T)
+            w_c_exp = w_c.view(1, T_q, 1, T_kv).expand(B, T_q, HQ, T_kv)
             gathered = sb_hq.gather(3, w_c_exp)
             bias_dense = torch.where(
-                in_window.view(1, T, 1, T), gathered, torch.zeros_like(gathered)
+                in_window.view(1, T_q, 1, T_kv), gathered, torch.zeros_like(gathered)
             )
             bias_dense = bias_dense.permute(0, 2, 1, 3)
         else:
-            bias_dense = torch.zeros(B, HQ, T, T, device=Q.device, dtype=q.dtype)
+            bias_dense = torch.zeros(B, HQ, T_q, T_kv, device=Q.device, dtype=q.dtype)
 
         neg_inf = torch.full((), float("-inf"), device=Q.device, dtype=bias_dense.dtype)
-        bias_dense = torch.where(causal_ok.view(1, 1, T, T), bias_dense, neg_inf)
+        bias_dense = torch.where(causal_ok.view(1, 1, T_q, T_kv), bias_dense, neg_inf)
     else:
-        bias_dense = torch.zeros(B, HQ, T, T, device=Q.device, dtype=q.dtype)
+        bias_dense = torch.zeros(B, HQ, T_q, T_kv, device=Q.device, dtype=q.dtype)
 
-    sink_expand = sink.view(1, HQ, 1, 1).expand(B, HQ, T, 1).to(bias_dense.dtype)
+    sink_expand = sink.view(1, HQ, 1, 1).expand(B, HQ, T_q, 1).to(bias_dense.dtype)
     bias_with_sink = torch.cat([bias_dense, sink_expand], dim=-1)
 
     k_pad = F.pad(k, (0, 0, 0, 1))
@@ -699,7 +744,8 @@ def ref_program(Q, K, sink, score_bias, is_causal):
 def main(
     BATCH: int = 1,
     H: int = 32,
-    N_CTX: int = 256,
+    KV_LEN: int = 256,
+    Q_LEN: int = 1,
     D_HEAD: int = 128,
     groups: int = 16,
     causal: bool = False,
@@ -707,32 +753,34 @@ def main(
     H_b: int = 1,
 ):
     assert H % H_b == 0, f"H={H} must be divisible by H_b={H_b}"
+    assert Q_LEN <= KV_LEN, f"Q_LEN={Q_LEN} must be <= KV_LEN={KV_LEN}"
+
     use_bias = W > 0
-    fwd_flops = 4 * BATCH * H * N_CTX * N_CTX * D_HEAD
-    bwd_flops = 10 * BATCH * H * N_CTX * N_CTX * D_HEAD
-    if causal:
-        fwd_flops *= 0.5
-        bwd_flops *= 0.5
+    fwd_flops = 4 * BATCH * H * Q_LEN * KV_LEN * D_HEAD
+    bwd_flops = 10 * BATCH * H * Q_LEN * KV_LEN * D_HEAD
 
     Q = (
-        torch.empty(BATCH, N_CTX, H, D_HEAD, dtype=dtype, device="cuda")
+        torch.empty(BATCH, Q_LEN, H, D_HEAD, dtype=dtype, device="cuda")
         .normal_()
         .requires_grad_()
     )
     head_kv = H // groups
     K = (
-        torch.empty(BATCH, N_CTX, head_kv, D_HEAD, dtype=dtype, device="cuda")
+        torch.empty(BATCH, KV_LEN, head_kv, D_HEAD, dtype=dtype, device="cuda")
         .normal_()
         .requires_grad_()
     )
     dO = (
-        torch.empty(BATCH, N_CTX, H, D_HEAD, dtype=dtype, device="cuda")
+        torch.empty(BATCH, Q_LEN, H, D_HEAD, dtype=dtype, device="cuda")
         .normal_()
         .requires_grad_()
     )
     if use_bias:
         score_bias = (
-            torch.randn(BATCH, N_CTX, H_b, W, dtype=torch.float32, device="cuda") * 0.1
+            torch.randn(
+                BATCH, Q_LEN, H_b, W, dtype=torch.float32, device="cuda"
+            )
+            * 0.1
         ).requires_grad_()
     else:
         score_bias = None
@@ -784,7 +832,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--batch", type=int, default=1)
     parser.add_argument("--h", type=int, default=12)
-    parser.add_argument("--n_ctx", type=int, default=1024 * 4)
+    parser.add_argument("--kv_len", type=int, default=1024 * 4)
+    parser.add_argument("--q_len", type=int, default=1,
+                        help="query length; use 1 for decoding (kvcache), "
+                             "or kv_len for prefill/full attention")
     parser.add_argument("--d_head", type=int, default=128)
     parser.add_argument("--causal", action="store_true", default=True)
     parser.add_argument("--groups", type=int, default=12)
@@ -800,14 +851,16 @@ if __name__ == "__main__":
         for hb in [1, 2, 3, 4, 6, 12]:
             if w == 0 and hb > 1:
                 continue
-            print(f"w: {w}, hb: {hb}")
-            main(
-                args.batch,
-                args.h,
-                args.n_ctx,
-                args.d_head,
-                args.groups,
-                args.causal,
-                w,
-                hb,
-            )
+            for q_len in [1, 32, args.q_len]:
+                print(f"w: {w}, hb: {hb}, q_len: {q_len}")
+                main(
+                    args.batch,
+                    args.h,
+                    args.kv_len,
+                    q_len,
+                    args.d_head,
+                    args.groups,
+                    args.causal,
+                    w,
+                    hb,
+                )

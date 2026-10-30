@@ -3,9 +3,8 @@ import torch
 from torch import Tensor, nn
 from torch.nn import functional as F
 from convpe_exp import ConvPE
-from attn_tilelang3 import convpe_attention as attention
-
-# from attn_tilelang_fix_seq_len import convpe_attention as attention
+from attn_tilelang import convpe_attention as attention
+# from attn_tilelang_pretrain import convpe_attention as attention
 # from attn_flex import convpe_attention as attention
 
 

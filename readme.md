@@ -62,7 +62,7 @@ ConvPE (Convolutional Position Embedding) substantially improves both the perfor
 |                 | 2K | 0.000 | **0.052** |
 |                 | 4K | 0.000 | **0.107** |
 | ruler_cwe       | 1K | 0.002 | 0.002 |
-| ruler_fwe       | 1K | 0.001 | 0.012 |
+| ruler_fwe       | 1K | 0.001 | **0.012** |
 | ruler_qa_squad  | 1K | 0.148 | **0.191** |
 |                 | 2K | 0.078 | **0.091** |
 |                 | 4K | 0.017 | **0.052** |
@@ -78,22 +78,18 @@ ConvPE (Convolutional Position Embedding) substantially improves both the perfor
 |ConvNet 4.335M | 0.945 | 0.737 |
 ## Requirements
 
-### Pytorch Flex kernels
+### Tilelang kernels 
+#### Make sure your torch cuda version and tilelang cuda version is the same with python venv cuda version or system cuda version
     apt install python3-dev
-    pip install -r requirements.txt
+    pip install -r requirements_tilelang.txt
+
+### Pytorch Flex kernels (Alternative)
+    apt install python3-dev
+    pip install -r requirements_flex.txt
 
 #### Edit transformer_convpe.py import
 
     from attn_flex import convpe_attention as attention
-
-### Tilelang kernels (Alternative)
-#### Make sure your torch cuda version and tilelang cuda version is the same with python venv cuda version or system cuda version
-
-    pip install -r requirements_tilelang.txt
-
-#### Edit transformer_convpe.py import
-
-    from attn_tilelang import convpe_attention as attention
 
 ## Demo Training  
 
@@ -125,6 +121,7 @@ https://www.modelscope.cn/datasets/AI-ModelScope/fineweb-edu/tree/master/sample/
     set step2_pretrain.py TrainingArguments max_steps=2000 to -1
 
 #### Start training
+##### Use attn_tilelang_pretrain.py kernel for higher throughput (Optional)
     python3 step2_pretrain.py
 
 #### Run step2_plot.ipynb to see results.
@@ -139,5 +136,8 @@ https://www.modelscope.cn/datasets/AI-ModelScope/fineweb-edu/tree/master/sample/
 
     python3 step4_len_ext_eval.py
 
+#### Run step4_plot.ipynb to see results.
+
+    python3 step5_len_ext_loss_eval.py
 
 
