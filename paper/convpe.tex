@@ -35,7 +35,7 @@
 
 \begin{abstract}
 
-ConvPE (Convolutional Position Embedding) substantially improves the performance and efficiency of Transformer models. With only 2.64\% more parameters and a 2.71\% increase in forward-pass time, it reduces training perplexity by 8.41\%. Crucially, it achieves the baseline's final loss with 31.33\% fewer training tokens, yielding a 26.87\% net reduction in wall-clock training time. ConvPE also exhibits superior context extrapolation, reducing validation perplexity by 71.10\% at 4K and 89.84\% at 8K contexts. By generating windowed attention-score biases via a lightweight convolution, ConvPE remains compatible with KV-cache inference, various attention masks, and high-dimensional modalities. The code is publicly available at \url{https://github.com/wzhagi/convpe}.
+ConvPE (Convolutional Position Embedding) substantially improves the performance and efficiency of Transformer models. With only 2.64\% more parameters and a 2.71\% increase in forward-pass time, it reduces training perplexity by 8.41\%. Crucially, it achieves the baseline's final loss with 31.33\% fewer training tokens, yielding a 26.87\% net reduction in wall-clock training time. ConvPE also exhibits superior context extrapolation, reducing validation perplexity by 71.10\% at 4K and 89.84\% at 8K contexts. By generating windowed attention-score biases via a lightweight convolution, ConvPE remains compatible with KV-cache concatenation, various attention masks, and high-dimensional modalities. The code is publicly available at \url{https://github.com/wzhagi/convpe}.
 
 \end{abstract}
 \keywords{Position Embedding \and Language Models \and Transformers \and Attention \and Vision Transformers}
