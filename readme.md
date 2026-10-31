@@ -82,7 +82,7 @@ ConvPE (Convolutional Position Embedding) substantially improves the performance
 ### Tilelang kernels 
 #### Make sure your torch cuda version and tilelang cuda version is the same with python venv cuda version or system cuda version
     apt install python3-dev
-    pip install -r requirements_tilelang.txt
+    pip install -r requirements.txt
 
 ### Pytorch Flex kernels (Alternative)
     apt install python3-dev
