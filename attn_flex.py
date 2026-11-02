@@ -20,7 +20,7 @@ def convpe_attention(q, kv, sink, score_bias=None):
         W = score_bias.size(-1)
 
         def score_mod(score, b, h, q_idx, kv_idx):
-            w_idx = kv_idx - (q_idx + offset) + W - 1
+            w_idx = (q_idx + offset) - kv_idx
             in_window = (w_idx >= 0) & (w_idx < W)
             w_idx_safe = w_idx.clamp(0, W - 1)
             return score + torch.where(
