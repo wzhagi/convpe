@@ -193,7 +193,7 @@ Figure~\ref{fig:pretrain} shows that ConvPE converges faster and achieves a lowe
 in TileLang and benchmark two configurations: \texttt{base RoPE} with
 $124.84$M parameters and \texttt{base w128d16} with $128.13$M parameters
 ($+2.64\%$), using a batch size of $4$ and a sequence length of $1024$. While the
-forward-pass time increases by $2.71\%$, slightly exceeding the parameter increase, the final training loss drops from $3.1195$ to $3.0316$ ($-2.82\%$). According to scaling laws~\cite{kaplan2020scaling,hoffmann2022training}, such a substantial loss reduction would typically require a model with $\sim 50\%$ more parameters. More importantly, despite the $6.54\%$ per-step overhead, the number of training tokens required to match the RoPE baseline's final loss decreases from $3$B to $2.06$B, a $31.33\%$ reduction. This translates to a net reduction in total wall-clock training time of approximately $26.87\%$.
+forward-pass time increases by $2.71\%$, slightly exceeding the parameter increase, the final training loss drops from $3.1195$ to $3.0316$ ($-2.82\%$). Despite the $6.54\%$ per-step overhead, the number of training tokens required to match the RoPE baseline's final loss decreases from $3$B to $2.06$B, a $31.33\%$ reduction. This translates to a net reduction in total wall-clock training time of approximately $26.87\%$.
 
 \subsection{Attention Analysis}
 \label{sec:attn_analysis}
