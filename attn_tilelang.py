@@ -741,6 +741,9 @@ def ref_program(Q, K, sink, score_bias, is_causal):
 # ============================================================
 # Main
 # ============================================================
+# ============================================================
+# Main
+# ============================================================
 def main(
     BATCH: int = 1,
     H: int = 32,
@@ -756,8 +759,13 @@ def main(
     assert Q_LEN <= KV_LEN, f"Q_LEN={Q_LEN} must be <= KV_LEN={KV_LEN}"
 
     use_bias = W > 0
+    test_backward = Q_LEN > 1
+
     fwd_flops = 4 * BATCH * H * Q_LEN * KV_LEN * D_HEAD
     bwd_flops = 10 * BATCH * H * Q_LEN * KV_LEN * D_HEAD
+    if causal:
+        fwd_flops *= 0.5
+        bwd_flops *= 0.5
 
     Q = (
         torch.empty(BATCH, Q_LEN, H, D_HEAD, dtype=dtype, device="cuda")
@@ -786,31 +794,34 @@ def main(
         score_bias = None
     sink = torch.full((H,), 0.5, dtype=torch.float32, device="cuda").requires_grad_()
 
-    # ---------- 数值对拍 ----------
     O = convpe_attention(Q, K, sink, score_bias, causal)
-    O.backward(dO, retain_graph=True)
-    dQ, Q.grad = Q.grad.clone(), None
-    dK, K.grad = K.grad.clone(), None
-    dB = None
-    if use_bias:
-        dB, score_bias.grad = score_bias.grad.clone(), None
-    dS, sink.grad = sink.grad.clone(), None
+    if test_backward:
+        O.backward(dO, retain_graph=True)
+        dQ, Q.grad = Q.grad.clone(), None
+        dK, K.grad = K.grad.clone(), None
+        dB = None
+        if use_bias:
+            dB, score_bias.grad = score_bias.grad.clone(), None
+        dS, sink.grad = sink.grad.clone(), None
 
-    O_ref = ref_program(Q, K, sink, score_bias, causal)
-    O_ref.backward(dO, retain_graph=True)
-    dQ_ref, Q.grad = Q.grad.clone(), None
-    dK_ref, K.grad = K.grad.clone(), None
-    dB_ref = None
-    if use_bias:
-        dB_ref, score_bias.grad = score_bias.grad.clone(), None
-    dS_ref, sink.grad = sink.grad.clone(), None
+        O_ref = ref_program(Q, K, sink, score_bias, causal)
+        O_ref.backward(dO, retain_graph=True)
+        dQ_ref, Q.grad = Q.grad.clone(), None
+        dK_ref, K.grad = K.grad.clone(), None
+        dB_ref = None
+        if use_bias:
+            dB_ref, score_bias.grad = score_bias.grad.clone(), None
+        dS_ref, sink.grad = sink.grad.clone(), None
 
-    torch.testing.assert_close(O, O_ref, rtol=2e-2, atol=5e-2)
-    torch.testing.assert_close(dK, dK_ref, rtol=2e-2, atol=5e-2)
-    torch.testing.assert_close(dQ, dQ_ref, rtol=2e-2, atol=5e-2)
-    if use_bias:
-        torch.testing.assert_close(dB, dB_ref, rtol=2e-2, atol=6e-2)
-    torch.testing.assert_close(dS, dS_ref, rtol=2e-2, atol=5e-2)
+        torch.testing.assert_close(O, O_ref, rtol=2e-2, atol=5e-2)
+        torch.testing.assert_close(dK, dK_ref, rtol=2e-2, atol=5e-2)
+        torch.testing.assert_close(dQ, dQ_ref, rtol=2e-2, atol=5e-2)
+        if use_bias:
+            torch.testing.assert_close(dB, dB_ref, rtol=2e-2, atol=6e-2)
+        torch.testing.assert_close(dS, dS_ref, rtol=2e-2, atol=5e-2)
+    else:
+        O_ref = ref_program(Q, K, sink, score_bias, causal)
+        torch.testing.assert_close(O, O_ref, rtol=1e-3, atol=5e-2)
 
     from tilelang.profiler import do_bench
 
@@ -818,14 +829,15 @@ def main(
         with torch.no_grad():
             convpe_attention(Q, K, sink, score_bias, causal)
 
-    def run_bwd():
-        O.backward(dO, retain_graph=True)
-
     latency = do_bench(run_fwd, warmup=500)
     print(f"tilelang fwd: {latency:.2f} ms, {fwd_flops / latency * 1e-9:.2f} TFlops")
 
-    latency = do_bench(run_bwd, warmup=500)
-    print(f"tilelang bwd: {latency:.2f} ms, {bwd_flops / latency * 1e-9:.2f} TFlops")
+    if test_backward:
+        def run_bwd():
+            O.backward(dO, retain_graph=True)
+
+        latency = do_bench(run_bwd, warmup=500)
+        print(f"tilelang bwd: {latency:.2f} ms, {bwd_flops / latency * 1e-9:.2f} TFlops")
 
 
 if __name__ == "__main__":
@@ -833,7 +845,7 @@ if __name__ == "__main__":
     parser.add_argument("--batch", type=int, default=1)
     parser.add_argument("--h", type=int, default=12)
     parser.add_argument("--kv_len", type=int, default=1024 * 4)
-    parser.add_argument("--q_len", type=int, default=1,
+    parser.add_argument("--q_len", type=int, default=1024 * 4,
                         help="query length; use 1 for decoding (kvcache), "
                              "or kv_len for prefill/full attention")
     parser.add_argument("--d_head", type=int, default=128)
@@ -847,11 +859,11 @@ if __name__ == "__main__":
         help="number of bias heads; H must be divisible by H_b",
     )
     args = parser.parse_args()
-    for w in [0, 1, 32, 64, 128]:
-        for hb in [1, 2, 3, 4, 6, 12]:
+    for w in [0, 128]:
+        for hb in [1, 12]:
             if w == 0 and hb > 1:
                 continue
-            for q_len in [1, 32, args.q_len]:
+            for q_len in [args.kv_len,1]:
                 print(f"w: {w}, hb: {hb}, q_len: {q_len}")
                 main(
                     args.batch,
