@@ -30,7 +30,7 @@ class ViT(nn.Module):
         if not self.training:
             x = torch.cat((x, torch.flip(x, (-1,))))
         x = self.emb.forward(x).flatten(2).mT.contiguous()
-        x = self.model(x)
+        x = self.model(x, 8, 8)
         x = self.cls(x)
         x = x.mean(-2)
         if not self.training:
