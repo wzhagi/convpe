@@ -35,7 +35,7 @@
 
 \begin{abstract}
 
-ConvPE (Convolutional Position Embedding) substantially improves the performance and efficiency of Transformer models. With only 2.64\% more parameters and a 2.71\% increase in forward-pass time, it reduces training perplexity by 8.41\%. Crucially, it achieves the baseline's final loss with 31.33\% fewer training tokens, yielding a 26.87\% net reduction in wall-clock training time. ConvPE also exhibits superior context extrapolation, reducing validation perplexity by 71.10\% at 4K and 89.84\% at 8K contexts. By generating windowed attention-score biases via a lightweight convolution, ConvPE remains compatible with KV-cache concatenation, various attention masks, and high-dimensional modalities. The code is publicly available at \url{https://github.com/wzhagi/convpe}.
+ConvPE (Convolutional Position Embedding) substantially improves the performance and efficiency of Transformer models. With only 2.64\% more parameters and a 2.71\% increase in forward-pass time, it reduces training perplexity by 8.41\%. Crucially, it achieves the baseline's final loss with 31.33\% fewer training tokens, yielding a 26.87\% net reduction in wall-clock training time. ConvPE also exhibits superior context extrapolation, increasing RULER accuracy by 29.51\% at 1K and 314.6\% at 2K contexts. By generating windowed attention-score biases via a lightweight convolution, ConvPE remains compatible with KV-cache concatenation, various attention masks, and high-dimensional modalities. The code is publicly available at \url{https://github.com/wzhagi/convpe}.
 
 \end{abstract}
 \keywords{Position Embedding \and Language Models \and Transformers \and Attention \and Vision Transformers}
@@ -57,7 +57,7 @@ We comprehensively evaluate ConvPE in language-model pretraining and vision tran
 
 \textbf{Performance:} 
 
-ConvPE reduces training perplexity by 8.41\% and improves average evaluation accuracy by 2.56\%. It also transfers effectively to vision tasks, improving ViT-Tiny~\cite{dosovitskiy2021image} accuracy on CIFAR-10 and CIFAR-100~\cite{krizhevsky2009learning} by 2.31\% and 10.85\%.
+ConvPE reduces training perplexity by 8.41\% and improves average evaluation accuracy by 2.35\%. It also transfers effectively to vision tasks, improving ViT-Tiny~\cite{dosovitskiy2021image} accuracy on CIFAR-10 and CIFAR-100~\cite{krizhevsky2009learning} by 2.31\% and 10.85\%.
 
 \textbf{Training and Token Efficiency:} 
 
@@ -65,7 +65,7 @@ Despite a small 6.54\% per-token wall-clock overhead and 2.64\% more parameters,
 
 \textbf{Context Extension:} 
 
-ConvPE significantly mitigates performance degradation at zero-shot context extensions. Compared to RoPE, it reduces validation perplexity by 15.32\% at 2K, 71.10\% at 4K, and 89.84\% at 8K. On the RULER benchmark, ConvPE boosts accuracy by 31.67\% at 1K and by over 300\% at 2K and 4K contexts.
+ConvPE significantly mitigates performance degradation at zero-shot context extensions. Compared to RoPE, it reduces perplexity on 1M tokens from the training dataset by 15.32\% at 2K, 71.10\% at 4K, and 89.84\% at 8K. On the RULER benchmark, ConvPE boosts accuracy by 29.51\% at 1K and by over 300\% at 2K contexts.
 
 \textbf{The main contributions of this paper are as follows:}
 \begin{itemize}
@@ -187,7 +187,7 @@ In additional experiments, we also try using $X$, $Q$~\cite{chang2021convolution
     \label{fig:pretrain}
 \end{figure}
 
-We choose "\texttt{base w128d16}" as the ConvPE variant configuration for performance and throughput considerations. We train the RoPE baseline and the ConvPE variant from scratch on the first 3B tokens of FineWeb-Edu-10BT. We use Muon~\cite{jordan2024muon} to optimize the 2D parameters, excluding the embedding layer and the language head, with a learning rate of $3\times10^{-3}$, while Adam~\cite{DBLP:journals/corr/KingmaB14} optimizes the remaining parameters at a learning rate of $3\times10^{-4}$, both using a cosine learning-rate scheduler. The training hyperparameters are: batch size $4$, gradient accumulation steps $4$, sequence length $1024$, and seed $42$.
+We choose "\texttt{base w128d16}" as the ConvPE variant configuration for performance and throughput considerations. We train the RoPE baseline and the ConvPE variant from scratch on the first 3B tokens of FineWeb-Edu-10BT~\cite{penedo2024fineweb}. We use Muon~\cite{jordan2024muon} to optimize the 2D parameters, excluding the embedding layer and the language head, with a learning rate of $3\times10^{-3}$, while Adam~\cite{DBLP:journals/corr/KingmaB14} optimizes the remaining parameters at a learning rate of $3\times10^{-4}$, both using a cosine learning-rate scheduler. The training hyperparameters are: batch size $4$, gradient accumulation steps $4$, sequence length $1024$, and seed $42$.
 
 Figure~\ref{fig:pretrain} shows that ConvPE converges faster and achieves a lower final loss compared to the RoPE baseline. We implement high-performance Flash MQA kernels
 in TileLang and benchmark two configurations: \texttt{base RoPE} with
@@ -217,6 +217,8 @@ Towards the far end of the window, the standard deviation becomes flat, and the 
 The static bias exhibits a clear layer-wise prior at the current position (offset 0). Layer 0 shows "self-enhancement" with a positive bias of \(+0.5885\), whereas all deeper layers exhibit "self-suppression" with negative biases. This mechanism shifts attention in deeper layers away from the current token and toward the historical context.
 
 \subsection{Evaluations}
+\label{sec:eval}
+
 This section evaluates the pretrained ConvPE and the RoPE baseline on pretraining and context-extension benchmarks without any fine-tuning.
 \subsubsection{Pretraining Evaluations}
 
@@ -227,14 +229,14 @@ This section evaluates the pretrained ConvPE and the RoPE baseline on pretrainin
 Dataset & Metric & RoPE & ConvPE & Random \\
 \midrule
 wikitext & perplexity & 46.56 & \textbf{42.05} & - \\
-lambada & perplexity, acc & 118.10, 0.2507 & \textbf{88.49}, \textbf{0.2604} & - \\
-hellaswag & acc, acc norm & 0.2894, 0.3148 & \textbf{0.2949}, \textbf{0.3272} & 0.25 \\
-xstorycloze\_en & acc & 0.5460 & \textbf{0.5526} & 0.5 \\
-piqa & acc, acc norm & 0.6251, 0.6208 & \textbf{0.6338}, \textbf{0.6235} & 0.5 \\
-arc\_easy & acc, acc norm & 0.5114, 0.4487 & \textbf{0.5421}, \textbf{0.4701} & 0.25 \\
-winogrande & acc & 0.5091 & \textbf{0.5193} & 0.5 \\
-boolq & acc & 0.5676 & \textbf{0.5893} & 0.5 \\
-truthfulqa\_mc1 & acc & 0.2399 & 0.2375 & \textbf{0.25} \\
+lambada~\cite{paperno2016lambada} & perplexity, acc & 118.10, 0.2507 & \textbf{88.49}, \textbf{0.2604} & - \\
+hellaswag~\cite{zellers2019hellaswag} & acc, acc norm & 0.2894, 0.3148 & \textbf{0.2949}, \textbf{0.3272} & 0.25 \\
+xstorycloze\_en~\cite{lin2022xstorycloze} & acc & 0.5460 & \textbf{0.5526} & 0.5 \\
+piqa~\cite{bisk2020piqa} & acc, acc norm & 0.6251, 0.6208 & \textbf{0.6338}, \textbf{0.6235} & 0.5 \\
+arc\_easy~\cite{clark2018arc} & acc, acc norm & 0.5114, 0.4487 & \textbf{0.5421}, \textbf{0.4701} & 0.25 \\
+winogrande~\cite{sakaguchi2019winogrande} & acc & 0.5091 & \textbf{0.5193} & 0.5 \\
+boolq~\cite{clark2019boolq} & acc & 0.5676 & \textbf{0.5893} & 0.5 \\
+truthfulqa\_mc1~\cite{lin2021truthfulqa} & acc & 0.2399 & 0.2375 & \textbf{0.25} \\
 \bottomrule
 \end{tabular}
 \captionof{table}{Evaluation results of pretraining models}
@@ -291,7 +293,7 @@ ruler\_qa\_squad & 0.148 & \textbf{0.191} & 0.078 & \textbf{0.091} & 0.017 & \te
 \label{tab:ruler}
 \end{table*}
 
-We then evaluate both models on RULER tasks. Table~\ref{tab:ruler} shows that ConvPE generally improves over RoPE on several long-context retrieval and reasoning tasks, particularly at 1K and 2K contexts. ConvPE even performs well at 4K contexts on some tasks. Some tasks remain near zero for both models, indicating that these tasks are too difficult for 125M-parameter models. Although the language-modeling loss of ConvPE remains stable up to 4K, the downstream tasks show that zero-shot context extension is still far from solved.
+We then evaluate both models on RULER~\cite{hsieh2024ruler} tasks. Table~\ref{tab:ruler} shows that ConvPE generally improves over RoPE on several long-context retrieval and reasoning tasks, particularly at 1K and 2K contexts. ConvPE even performs well at 4K contexts on some tasks. Some tasks remain near zero for both models, indicating that these tasks are too difficult for 125M-parameter models. Although the language-modeling loss of ConvPE remains stable up to 4K, the downstream tasks show that zero-shot context extension is still far from solved.
 
 
 \subsection{2D Position Embedding}
@@ -319,9 +321,64 @@ ConvNet & 4.335M & \textbf{0.945} & \textbf{0.737} \\
 
 Table~\ref{tab:cifar} shows that ConvPE transfers effectively to vision transformers and outperforms the RoPE baseline. The influence of hyperparameters requires further study on larger models and datasets.
 
+\subsection{Peer Comparison}
+We thank Qiao Zhijian from Hong Kong University of Science and Technology for evaluating ConvPE with additional baselines. Note that the training setting is not entirely the same as ours; therefore, the results are not directly comparable to ours. The main difference is that the experiments in this section do not tie the language model head weights to the embedding layer weights. Details are reported in the ConvPE GitHub repository (\texttt{pe\_comparison.md}).
+
+\begin{table*}[!ht]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lcccccccccc}
+\toprule
+ & & & \multicolumn{4}{c}{FineWeb-Edu 1M PPL} & & \multicolumn{3}{c}{RULER Acc} \\
+\cmidrule(lr){4-7}\cmidrule(lr){9-11}
+method & M params & ms/step & 1K & 2K & 4K & 8K & Eval Acc & 1K & 2K & 4K \\
+\midrule
+NoPE~\cite{kazemnejad2023impact}      & 163.470 & \textbf{141.30} & 24.34 & 173.71 & 1389.25 & 3618.99 & 42.78 & 19.31 & 0.15 & 0.00 \\
+Composite~\cite{chang2021convolutionsselfattentionreinterpretingrelative} & 163.498 & 180.02 & 21.34 & 38.15  & 246.16  & 984.34  & 44.37 & 25.97 & 0.88 & 0.09 \\
+RoPE~\cite{su2021roformer}      & 163.470 & 149.03 & 22.89 & 24.19  & 55.01   & 207.58  & 43.86 & 11.96 & 2.63 & 0.26 \\
+ConvPE    & 166.764 & 156.00 & \underline{20.52} & \underline{19.95} & 20.67 & 29.33 & 44.66 & \textbf{26.58} & \underline{14.46} & \underline{3.49} \\
+ALiBi~\cite{press2021train}     & 163.470 & \underline{145.67} & 21.37 & 20.77 & 20.60 & 20.52 & 43.90 & 14.37 & 3.80 & 1.61 \\
+CABLE~\cite{veisi2025cable}     & 163.691 & 188.05 & 20.71 & 20.01 & \underline{19.68} & \underline{19.52} & \underline{44.72} & 19.80 & 7.69 & 3.22 \\
+DAPEv2~\cite{zheng2025dapev2}      & 163.512 & 273.71 & \textbf{19.47} & \textbf{18.71} & \textbf{18.31} & \textbf{18.09} & \textbf{44.74} & \underline{26.11} & \textbf{17.09} & \textbf{7.45} \\
+\bottomrule
+\end{tabular}
+\caption{Comparison with peer methods. Parameters, milliseconds per step, and PPL are lower-is-better metrics, whereas accuracies are higher-is-better. Eval acc denotes the average accuracy in Section~\ref{sec:eval}; RULER acc denotes the average accuracy in Table~\ref{tab:ruler}, where the normalized accuracy (acc norm) is used when available.}
+\label{tab:lm-summary}
+\end{table*}
+
+\begin{table}[!ht]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lccc}
+\toprule
+Method & M params & ms/step & CIFAR-100 Acc \\
+\midrule
+NoPE~\cite{kazemnejad2023impact}             & 5.363 & 66.45 & 56.03 \\
+2D ALiBi~\cite{fuller2023croma}       & 5.363 & 66.63 & 61.38 \\
+Composite2D~\cite{chang2021convolutionsselfattentionreinterpretingrelative}         & 5.596 & 78.29 & 63.50 \\
+2D RoPE~\cite{heo2024ropevit}       & 5.363 & 78.44 & 64.17 \\
+Learnable 2D abs. PE~\cite{dosovitskiy2021image} & 5.376 & \textbf{63.50} & 64.36 \\
+Fixed 2D sin-cos~\cite{dosovitskiy2021image}    & 5.363 & 66.65 & 65.07 \\
+CABLE2D~\cite{veisi2025cable}           & 5.377 & 98.90 & 65.25 \\
+DAPE2Dv2~\cite{zheng2025dapev2}            & 5.374 & 92.74 & 66.01 \\
+ConvPE2D           & 5.377 & 82.03 & \textbf{67.98} \\
+\bottomrule
+\end{tabular}
+\caption{CIFAR-100 results. ms/step is lower-is-better, and accuracy is higher-is-better.}
+\label{tab:cifar100}
+\end{table}
+
+Table~\ref{tab:lm-summary} shows that ConvPE is among the first tier of methods in terms of both FineWeb-Edu 1M PPL and evaluation accuracy. It achieves highly competitive PPL across context lengths and remains substantially better than NoPE, Composite, and RoPE at longer contexts, while its evaluation accuracy is very close to the best result. On RULER, ConvPE delivers the best overall performance among the non-quadratic methods, with the strongest accuracy at the training context length and competitive results at medium and long contexts. Although DAPE exhibits stronger length extrapolation, it has quadratic complexity and is much slower per training step, making it impractical for large-scale long-context training. ALiBi and CABLE are efficient, but both impose rigid distance-penalty priors ALiBi uses fixed linear decay, and CABLE only learns to modulate a fixed distance-penalty skeleton which limits their ability to model ultra-long contexts. In contrast, ConvPE applies NoPE outside the window and therefore does not suffer from an explicit extrapolation limit, offering a more favorable accuracy-efficiency trade-off for large-scale long-context modeling.
+
+Table~\ref{tab:cifar100} reports the CIFAR-100 results. ConvPE2D achieves the best accuracy among all compared methods.
+
 \section{Conclusions and Future Work}
 
-ConvPE delivers substantial performance gains at a minor parameter and computational cost, providing a powerful alternative for positional embeddings. We adopt $H_b=1$ without any parameter-saving technique as the default configuration, which achieves the best balance among performance, parameter efficiency, and computational cost. ConvPE is compatible with RoPE, various attention masks, and KV-cache concatenation, and it naturally supports multidimensional extensions. 
+ConvPE delivers substantial performance gains at a minor parameter and computational cost. Although some existing methods report stronger results on individual metrics, these gains are accompanied by compromises in training efficiency, compatibility, or extrapolation behavior. When performance, parameter efficiency, computational cost, and compatibility are considered jointly, ConvPE provides the most favorable overall trade-off in our evaluations and is a strong alternative for positional embeddings.
+
+We adopt $H_b=1$ without any parameter-saving technique as the default configuration, which achieves the best balance among performance, parameter efficiency, and computational cost. ConvPE is compatible with RoPE, various attention masks, and KV-cache concatenation, and it naturally supports multidimensional extensions. 
 
 Future work can explore the following directions:
 \begin{itemize}
