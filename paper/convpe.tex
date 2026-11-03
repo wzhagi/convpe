@@ -42,7 +42,7 @@ ConvPE (Convolutional Position Embedding) improves Transformer performance and e
 
 \begin{wrapfigure}{r}{0.48\textwidth}
     \centering
-    \includegraphics[width=\linewidth]{FIGURES/overview.png}
+    \includegraphics[width=\linewidth]{overview.png}
     \captionsetup{hypcap=false}
     \caption{ConvPE relative to the RoPE baseline (dashed line at 1.0). Blue bars are lower-is-better metrics; green bars are higher-is-better metrics.}
     \label{fig:overview}
@@ -128,12 +128,12 @@ where $N$ is the batch size, $H$ is the number of attention heads, and $H_b$ mus
     \centering
     \begin{minipage}{0.52\textwidth}
         \centering
-        \includegraphics[width=\linewidth]{FIGURES/convpe.jpeg}
+        \includegraphics[width=\linewidth]{convpe.jpeg}
     \end{minipage}
     \hfill
     \begin{minipage}{0.38\textwidth}
         \centering
-        \includegraphics[width=\linewidth]{FIGURES/score_bias.jpeg}
+        \includegraphics[width=\linewidth]{score_bias.jpeg}
     \end{minipage}
     \caption{Left: ConvPE projects the hidden states to $C$ channels and applies a causal convolution with window $W$ to produce $H_b\times W$ score biases per position. Right: the bias is added only inside the $W$-token window (yellow); future positions are masked (blue) and visible positions beyond the window receive no bias (white).}
     \label{fig:convpe_method}
@@ -185,14 +185,14 @@ We train 10 tiny and 8 base configurations and select by held-out loss after one
     \centering
     \begin{minipage}{0.48\textwidth}
         \centering
-        \includegraphics[width=\linewidth]{FIGURES/wikitext103tiny.png}
+        \includegraphics[width=\linewidth]{wikitext103tiny.png}
         \caption{Tiny models on WikiText-103. Curves are training loss; stars mark the held-out WikiText-2 loss used for selection.}
         \label{fig:wt103t}
     \end{minipage}
     \hfill
     \begin{minipage}{0.48\textwidth}
         \centering
-        \includegraphics[width=\linewidth]{FIGURES/wikitext103base.png}
+        \includegraphics[width=\linewidth]{wikitext103base.png}
         \caption{Base models on WikiText-103, with the same conventions as \Cref{fig:wt103t}.}
         \label{fig:wt103b}
     \end{minipage}
@@ -209,7 +209,7 @@ We also tried feeding $Q$ (as in Composite~\cite{chang2021convolutionsselfattent
 
 \begin{figure}[!t]
     \centering
-    \includegraphics[width=0.70\linewidth]{FIGURES/pretrain.png}
+    \includegraphics[width=0.70\linewidth]{pretrain.png}
     \caption{Training loss on the first 3B tokens of FineWeb-Edu-10BT for the RoPE baseline and ConvPE \texttt{w128d16}. The dashed curve is the loss difference (RoPE minus ConvPE).}
     \label{fig:pretrain}
 \end{figure}
@@ -223,6 +223,13 @@ To measure cost, we implement high-performance Flash MQA kernels in TileLang and
 
 To understand the role of the ConvPE module, we analyze the kernel weights and the static output bias of the trained \texttt{base w128d16} model. Since the average weights are close to zero, the standard deviation indicates \textbf{feature selectivity}: a higher standard deviation means that the kernel focuses on specific channels. \Cref{fig:attn} shows three properties.
 
+\begin{figure}[!ht]
+    \centering
+    \includegraphics[width=\linewidth]{attention.png}
+    \caption{ConvPE statistics of the pretrained \texttt{base w128d16} model across layers. Left: standard deviation of the kernel weights in the input dimension. Middle: standard deviation in the output dimension. Right: static output bias, averaged over bias heads. The x-axis is the relative offset ($-127$ to $0$; $0$ is the current token).}
+    \label{fig:attn}
+\end{figure}
+
 \textbf{1. Near-end dominance.}
 Near the current token, both the static bias and the input-feature selectivity reach their largest magnitudes. This indicates that the positional relationship between nearby tokens is important: ConvPE applies highly specific feature extraction and strong positional priors to the immediate local context.
 
@@ -231,13 +238,6 @@ Toward the far end of the window, the standard deviation is lower and the static
 
 \textbf{3. Self-suppression and self-enhancement.}
 The static bias has a clear layer-wise pattern at the current position. Layer 0 shows self-enhancement with a bias of $+0.5885$, whereas every deeper layer except L4 (a near-zero $+0.0115$) shows self-suppression with a negative bias. This is consistent with deeper layers shifting attention away from the current token and toward the historical context.
-
-\begin{figure}[!t]
-    \centering
-    \includegraphics[width=\linewidth]{FIGURES/attention.png}
-    \caption{ConvPE statistics of the pretrained \texttt{base w128d16} model across layers. Left: standard deviation of the kernel weights in the input dimension. Middle: standard deviation in the output dimension. Right: static output bias, averaged over bias heads. The x-axis is the relative offset ($-127$ to $0$; $0$ is the current token).}
-    \label{fig:attn}
-\end{figure}
 
 \subsection{Evaluations}
 \label{sec:eval}
