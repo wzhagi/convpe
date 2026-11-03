@@ -17,12 +17,12 @@ RoPE, arbitrary masks, KV caching, and n-dimensional convolutions, and leaves po
 the window unbiased.
 
 
-| ![convpe](/paper/FIGURES/convpe.jpeg) | ![score_bias](/paper/FIGURES/score_bias.jpeg) |
+| ![convpe](/paper/convpe.jpeg) | ![score_bias](/paper/score_bias.jpeg) |
 |---|---|
 
 ## Pretrain curves on the first 3B tokens of FineWeb-Edu-10BT
 
-![](/paper/FIGURES/pretrain.png)
+![](/paper/pretrain.png)
 
 ## Pretraining Evaluations
 
