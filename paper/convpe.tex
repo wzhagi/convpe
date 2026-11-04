@@ -33,7 +33,7 @@
 
 \begin{abstract}
 
-ConvPE (Convolutional Position Embedding) improves both the accuracy and efficiency of Transformer models in language modeling, long-context extension, and vision. It injects a windowed, content-dependent bias into attention scores through a lightweight causal convolution over a low-dimensional projection of the hidden states. ConvPE is compatible with RoPE, arbitrary attention masks, and KV concatenation. It also supports high-dimensional positional embeddings via high-dimensional convolutions. In a reproduction, ConvPE outperforms five 1D baselines and eight 2D baselines. The code is publicly available at \url{https://github.com/wzhagi/convpe}.
+ConvPE (Convolutional Position Embedding) improves both the performance and efficiency of Transformer models in language modeling, long-context extension, and vision. It injects a windowed, content-dependent bias into attention scores through a lightweight causal convolution over a low-dimensional projection of the hidden states. ConvPE is compatible with RoPE, arbitrary attention masks, and KV concatenation. It also supports high-dimensional positional embeddings via high-dimensional convolutions. In a reproduction, ConvPE outperforms five 1D baselines and eight 2D baselines. The code is publicly available at \url{https://github.com/wzhagi/convpe}.
 
 \end{abstract}
 \keywords{Position Embedding \and Language Models \and Transformers \and Attention \and Vision Transformers}
@@ -61,7 +61,7 @@ We evaluate ConvPE on language-model pretraining, downstream evaluation, long-co
 \begin{itemize}
     \item We propose ConvPE, a convolutional attention-score-bias position embedding that combines strong performance with broad compatibility.
     \item We study the influence of ConvPE hyperparameters and architecture choices, identifying a simple default configuration with a favorable performance-efficiency balance.
-    \item We demonstrate that ConvPE improves training efficiency, token efficiency, and zero-shot long-context extrapolation in language models.
+    \item We demonstrate that ConvPE improves training efficiency, token efficiency, and long-context extrapolation in language models.
     \item We verify the effectiveness of ConvPE2D in vision transformers on CIFAR-10 and CIFAR-100.
     \item We develop high-performance TileLang~\cite{DBLP:journals/corr/abs-2504-17577} kernels for ConvPE.
 \end{itemize}
@@ -395,7 +395,7 @@ ConvPE2D           & 5.377 & 82.03 & \textbf{67.98} \\
 \section{Conclusions and Future Work}
 \label{sec:conclusion}
 
-ConvPE adds a learned, windowed bias to attention scores which is compatible with RoPE, various attention masks, and KV-cache concatenation, and it naturally supports multidimensional extensions. In our experiments it improves pretraining and validation perplexity, zero-shot accuracy, context extension perplexity and accuracy, and CIFAR accuracy at a small parameter and computational overhead. Among the compared methods, ConvPE combines competitive downstream accuracy with a FlashAttention-compatible design; when accuracy, parameter count, per-step cost, and compatibility are considered jointly, it is the most favorable choice for long-context training.
+ConvPE adds a learned, windowed bias to attention scores which is compatible with RoPE, various attention masks, and KV-cache concatenation, and it naturally supports multidimensional extensions. In our experiments it improves pretraining and validation perplexity, evaluation accuracy, context extension perplexity and accuracy, and CIFAR accuracy at a small parameter and computational overhead. Among the compared methods, ConvPE combines competitive downstream accuracy with a FlashAttention-compatible design; when accuracy, parameter count, per-step cost, and compatibility are considered jointly, it is the most favorable choice for long-context training.
 
 Our study has two main limitations. First, the main experiments use a single seed and models of up to $167$M parameters, so the size of the gains at larger scale is unknown. Second, the max context length evaluated is 8K. We view these as directions for future work:
 
