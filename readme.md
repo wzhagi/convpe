@@ -155,12 +155,21 @@ https://www.modelscope.cn/datasets/AI-ModelScope/fineweb-edu/tree/master/sample/
 
 #### Run step3_plot.ipynb to see results.
 
-### 4. Context Length Extension
+### 4. Context Length Extension Zero-Shot Evaluations
+
+#### Edit model max_seq_len in config.json to 8192
 
     python3 step4_len_ext_eval.py
 
 #### Run step4_plot.ipynb to see results.
 
-    python3 step5_len_ext_loss_eval.py
+### 5. Context Extension Training
 
+#### download 013_00000.parquet into data/fineweb-edu-10BT
+#### Edit model max_seq_len in config.json to 8192
+    python3 step5_prepare_len_ext_parquet.py
+    python3 step6_len_ext_ppl_eval.py
+    python3 step7_len_ext_train.py
+    python3 step8_len_ext_ppl_eval.py
+    python3 step9_len_ext_eval.py
 

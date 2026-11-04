@@ -9,10 +9,10 @@ CHECKPOINTS = [
     "results_pretrain/base_rope_42",
     "results_pretrain/base_nope_w128d16r0h1g1_42",
 ]
-BIN_PATH = "data/fineweb-4parquet.bin"
+BIN_PATH = "data/fineweb-13parquet-part001.bin"
 WINDOW_SIZES = [1024, 2048, 4096, 8192]
-NUM_TEST_TOKENS = 1024 * 1024            # 直接取 1M 个 token，每个长度下至少有 128 个块
-BATCH_SIZE = 1                           # 批大小，显存不够就降到 1~2
+NUM_TEST_TOKENS = 10 * 1024 * 1024
+BATCH_SIZE = 1
 
 
 def set_seed(seed=42):
