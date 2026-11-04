@@ -6,7 +6,15 @@ ConvPE（卷积位置编码）提升了 Transformer 模型在语言建模、长�
 **English Abstract**  
 ConvPE (Convolutional Position Embedding) improves both the performance and efficiency of Transformer models in language modeling, long-context extension, and vision. It injects a windowed, content-dependent bias into attention scores through a lightweight causal convolution over a low-dimensional projection of the hidden states. ConvPE is compatible with RoPE, arbitrary attention masks, and KV concatenation. It also supports high-dimensional positional embeddings via high-dimensional convolutions. In a reproduction, ConvPE outperforms five 1D baselines and eight 2D baselines.
 
+| ![convpe](/paper/convpe.jpeg) | ![score_bias](/paper/score_bias.jpeg) |
+|---|---|
+
+## Evaluations Overview
 ![overview](/paper/overview.png)
+
+## Pretraining
+
+![pretrain](/paper/pretrain.png)
 
 ## Pretraining Evaluations
 
@@ -28,8 +36,6 @@ ConvPE (Convolutional Position Embedding) improves both the performance and effi
 | Average† | acc | 0.4372 | **0.4475** | -- |
 
 † Mean of one accuracy per task (acc-norm for HellaSwag, PIQA, and ARC-Easy; acc otherwise), excluding the two perplexities.
-
-![pretrain](/paper/pretrain.png)
 
 ## Context Extension
 
