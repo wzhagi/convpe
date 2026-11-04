@@ -1,9 +1,7 @@
 # ConvPE
 
-**中文摘要**  
 ConvPE（卷积位置编码）提升了 Transformer 模型在语言建模、长上下文扩展和视觉任务中的性能与效率。它通过对隐藏状态的低维投影进行轻量级因果卷积，将窗口化、内容依赖的偏置注入注意力分数。ConvPE 兼容 RoPE、任意注意力掩码和 KV 拼接。它还通过高维卷积支持高维位置嵌入。在复现中，ConvPE 优于五个一维基线和八个二维基线。
-
-**English Abstract**  
+ 
 ConvPE (Convolutional Position Embedding) improves both the performance and efficiency of Transformer models in language modeling, long-context extension, and vision. It injects a windowed, content-dependent bias into attention scores through a lightweight causal convolution over a low-dimensional projection of the hidden states. ConvPE is compatible with RoPE, arbitrary attention masks, and KV concatenation. It also supports high-dimensional positional embeddings via high-dimensional convolutions. In a reproduction, ConvPE outperforms five 1D baselines and eight 2D baselines.
 
 | ![convpe](/paper/convpe.jpeg) | ![score_bias](/paper/score_bias.jpeg) |
