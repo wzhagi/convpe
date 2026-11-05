@@ -4,6 +4,8 @@
     "alias": "niah_single_3",
     "sample_len": 500,
     "4096,none": 0.01,
-    "4096_stderr,none": "N/A"
+    "4096_stderr,none": "N/A",
+    "8192,none": 0.012,
+    "8192_stderr,none": "N/A"
   }
 }

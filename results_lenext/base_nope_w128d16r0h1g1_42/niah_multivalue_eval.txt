@@ -4,6 +4,8 @@
     "alias": "niah_multivalue",
     "sample_len": 500,
     "4096,none": 0.128,
-    "4096_stderr,none": "N/A"
+    "4096_stderr,none": "N/A",
+    "8192,none": 0.032,
+    "8192_stderr,none": "N/A"
   }
 }

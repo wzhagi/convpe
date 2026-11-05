@@ -12,6 +12,7 @@ torch._dynamo.config.recompile_limit = 64
 
 CHECKPOINTS = [
     "results_lenext/base_rope_42",
+    "results_lenext/base_ropeyarn_42",
     "results_lenext/base_nope_w128d16r0h1g1_42",
 ]
 
@@ -31,7 +32,7 @@ TASKS = [
     # "ruler_qa_hotpot",
 ]
 
-SEQ_LENGTHS = [4096]
+SEQ_LENGTHS = [4096, 4096*2]
 
 
 def main(name, tasks):
@@ -41,6 +42,10 @@ def main(name, tasks):
         tokenizer = AutoTokenizer.from_pretrained(checkpoint)
         print(tokenizer)
         model = LanguageModel.from_pretrained(checkpoint).to("cuda")
+        if "yarn" in checkpoint:
+            model.to_yarn_()
+        if "cope" in checkpoint:
+            model.to_cope_()
         print(model)
         model.eval()
         model.compile()

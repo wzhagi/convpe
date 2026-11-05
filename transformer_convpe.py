@@ -1,9 +1,11 @@
 from typing import Optional, Tuple
+import math
 import torch
 from torch import Tensor, nn
 from torch.nn import functional as F
 from convpe_exp import ConvPE
 from attn_tilelang import convpe_attention as attention
+
 # from attn_tilelang_pretrain import convpe_attention as attention
 # from attn_flex import convpe_attention as attention
 
@@ -159,7 +161,7 @@ class MultiQueryAttention(nn.Module):
         return self.wo(o.flatten(-2)), new_kvcache, new_sbcache
 
 
-class RotaryPositionalEmbedding(nn.Module):
+class RoPE(nn.Module):
     def __init__(
         self,
         dim_rope: int,
@@ -222,3 +224,109 @@ class RotaryPositionalEmbedding(nn.Module):
             out1 = x1 * cos + x0 * sin
         x_rope_out = torch.stack([out0, out1], dim=-1).flatten(-2).to(dtype)
         return torch.cat([x_rope_out, x[..., self.dim_rope :]], dim=-1)
+
+
+class YaRN(RoPE):
+    """
+    YaRN baseline，所有依赖参数自动从 max_seq_len / original_max_len 推导：
+      - scale    = max_seq_len / original_max_len
+      - mscale   = 0.1 * ln(scale) + 1               (scale > 1 时)
+      - low/high = beta_fast / beta_slow 对应的 correction range（浮点，不取整）
+    beta_fast / beta_slow 保持默认 32 / 1（1K→8K 场景下无需调整）。
+    inverse 与 mscale 严格对称：inverse(forward(x)) == x。
+    """
+
+    def __init__(
+        self,
+        dim_rope: int = 64,
+        max_seq_len: int = 8192,
+        original_max_len: int = 1024,
+        base: int = 10000,
+        base_dim: int = 64,
+        beta_fast: float = 32.0,
+        beta_slow: float = 1.0,
+    ):
+        super().__init__(dim_rope, max_seq_len, base, base_dim)
+        assert (
+            max_seq_len >= original_max_len > 0
+        ), "要求 max_seq_len >= original_max_len > 0"
+        self.original_max_len = original_max_len
+        self.beta_fast = beta_fast
+        self.beta_slow = beta_slow
+
+        # ---- 自动推导 ----
+        self.scale = max_seq_len / original_max_len
+        self.mscale = self._get_mscale(self.scale)
+        self._L = self.dim_rope // 2
+        self._low, self._high = self._compute_correction_range()
+
+    @staticmethod
+    def _get_mscale(scale: float) -> float:
+        if scale <= 1.0:
+            return 1.0
+        return 0.1 * math.log(scale) + 1.0
+
+    def _find_correction_dim(self, num_rotations: float) -> float:
+        """返回 pair index（浮点，在 [0, dim_rope/2) 范围内），对应周期
+        T = original_max_len / num_rotations。不取整，避免 ramp 量化误差。"""
+        denom = num_rotations * 2 * math.pi
+        if self.original_max_len <= denom:
+            return 0.0
+        return (
+            self.base_dim
+            * math.log(self.original_max_len / denom)
+            / (2 * math.log(self.base))
+        )
+
+    def _compute_correction_range(self):
+        # 保留浮点，不取整；与 YaRN 参考实现（DeepSeek / HF）对齐
+        low = max(0.0, self._find_correction_dim(self.beta_fast))
+        high = min(float(self._L - 1), self._find_correction_dim(self.beta_slow))
+        if high <= low:
+            high = low + 1e-3
+        return low, high
+
+    def calculate_cos_sin(self, pos, seq_len, device):
+        dtype = torch.float32
+        theta = self.base ** -(
+            torch.arange(0, self.dim_rope, 2, device=device, dtype=dtype)
+            / self.base_dim
+        )
+        if self.scale > 1.0:
+            # 高频区外推、低频区插值、中间线性 ramp 过渡
+            theta_extra = theta.clone()          # 外推（不缩放）
+            theta_inter = theta / self.scale     # 插值（线性缩放）
+            ramp = torch.clamp(
+                (torch.arange(self._L, device=device, dtype=dtype) - self._low)
+                / (self._high - self._low),      # 浮点 low/high，无 +1e-8 污染
+                0.0,
+                1.0,
+            )
+            theta = theta_inter * ramp + theta_extra * (1 - ramp)
+
+        seq_idx = torch.arange(pos, pos + seq_len, device=device, dtype=dtype)
+        idx_theta = torch.outer(seq_idx, theta)
+        return (
+            torch.cos(idx_theta).unsqueeze(-2),
+            torch.sin(idx_theta).unsqueeze(-2),
+        )
+
+    def forward(self, x: Tensor, pos: int = 0, inverse: bool = False) -> Tensor:
+        seq_len = x.size(-3)
+        if self.max_seq_len > 0:
+            if self.cos is None or self.cos.device != x.device:
+                self.cos, self.sin = self.calculate_cos_sin(
+                    0, self.max_seq_len, x.device
+                )
+            cos = self.cos[pos : pos + seq_len, :]
+            sin = self.sin[pos : pos + seq_len, :]
+        else:
+            cos, sin = self.calculate_cos_sin(pos, seq_len, x.device)
+
+        if inverse:
+            cos = cos / self.mscale
+            sin = sin / self.mscale
+        else:
+            cos = cos * self.mscale
+            sin = sin * self.mscale
+        return self.apply_rope(x, cos, sin, inverse)

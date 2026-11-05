@@ -22,7 +22,7 @@ class LanguageModelConfig(PretrainedConfig):
         self.is_encoder_decoder = False
 
 
-class LanguageModel(PreTrainedModel,GenerationMixin):
+class LanguageModel(PreTrainedModel, GenerationMixin):
 
     config_class = LanguageModelConfig
     _tied_weights_keys = {"lm_head.weight": "tok_emb.weight"}
@@ -31,7 +31,7 @@ class LanguageModel(PreTrainedModel,GenerationMixin):
         super().__init__(config)
         self.tok_emb = nn.Embedding(config.vocab_size, config.dim_model)
         if config.dim_rope > 0:
-            self.rope = RotaryPositionalEmbedding(config.dim_rope, config.max_seq_len)
+            self.rope = RoPE(config.dim_rope, config.max_seq_len)
         else:
             self.rope = None
         self.transformer = Transformer(
@@ -77,3 +77,14 @@ class LanguageModel(PreTrainedModel,GenerationMixin):
         return CausalLMOutputWithPast(
             loss, logits, current_key_values if use_cache else None
         )
+
+    def set_rope(self, rope):
+        self.rope = rope
+        for attn in self.transformer.attns:
+            attn.rope = rope
+
+    def to_yarn_(self):
+        self.set_rope(YaRN())
+
+    def to_cope_(self):
+        self.set_rope(CoPE())

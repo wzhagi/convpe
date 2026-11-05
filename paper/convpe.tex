@@ -260,53 +260,53 @@ This section evaluates the pretrained ConvPE and RoPE models on downstream bench
 \begin{table}[!ht]
 \centering
 \small
-\begin{tabular}{lcccc}
+\begin{tabular}{lccccc}
 \toprule
-Context & RoPE & ConvPE & RoPE 8K & ConvPE 8K \\
+Context & RoPE & ConvPE & RoPE-8K & YaRN-8K & ConvPE-8K \\
 \midrule
-1K & 22.5272 & \textbf{20.672} (-8.2\%) & -- & -- \\
-2K & 23.4439 & \textbf{20.1441} (-14.1\%) & -- & -- \\
-4K & 67.8413 & \textbf{20.6415} (-69.6\%) & -- & -- \\
-8K & 260.4544 & \textbf{27.8015} (-89.3\%) & 23.0702 & \textbf{19.7405} (-14.4\%) \\
+1K & 22.5272 & \textbf{20.672} (-8.2\%) & -- & -- & -- \\
+2K & 23.4439 & \textbf{20.1441} (-14.1\%) & -- & -- & -- \\
+4K & 67.8413 & \textbf{20.6415} (-69.6\%) & -- & -- & -- \\
+8K & 260.4544 & \textbf{27.8015} (-89.3\%) & 23.0702 & 21.6276 & \textbf{19.7405} (-8.7\%) \\
 \bottomrule
 \end{tabular}
-\caption{Language-modeling perplexity on the validation dataset for context lengths from 1K to 8K. The 8K suffix denotes models continually trained with a context length of 8192 on the context-extension dataset.}
+\caption{Validation perplexity for context lengths from 1K to 8K.}
 \label{tab:valppl}
 \end{table}
 
-We first measure language-modeling perplexity on the validation dataset at increasing context lengths. Both models are initially trained with 1K-token contexts. \Cref{tab:valppl} shows a clear advantage for ConvPE as the context length grows. The perplexity of RoPE rises sharply beyond 2K, whereas ConvPE remains stable through 4K. We further train the pretrained models on an additional 150M tokens from FineWeb-Edu-10BT with a context length of 8K. When evaluated at an 8K context length, ConvPE 8K achieves lower perplexity than ConvPE evaluated at 1K, whereas RoPE shows the opposite trend. This demonstrates the effectiveness of ConvPE for context extension.
+We first measure language-modeling perplexity on the validation dataset at increasing context lengths. Both models are initially trained with 1K-token contexts. \Cref{tab:valppl} shows a clear advantage for ConvPE as the context length grows. The perplexity of RoPE rises sharply beyond 2K, whereas ConvPE remains stable through 4K. We further train three models, RoPE-8K, YaRN-8K, and ConvPE-8K, starting from the pretrained models on an additional 150M tokens from FineWeb-Edu-10BT with a context length of 8K. When evaluated at an 8K context length, ConvPE-8K achieves the lowest perplexity among the three models. This demonstrates the effectiveness of ConvPE for context extension.
 
 \begin{table*}[!ht]
 \centering
 \small
 \setlength{\tabcolsep}{4pt}
-\begin{tabular}{lcccccccc}
+\begin{tabular}{lccccccccccc}
 \toprule
-& \multicolumn{2}{c}{1K} & \multicolumn{2}{c}{2K} & \multicolumn{4}{c}{4K} \\
-\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-9}
-Task & RoPE & ConvPE & RoPE & ConvPE & RoPE & ConvPE & RoPE 8K & ConvPE 8K \\
+& \multicolumn{2}{c}{1K} & \multicolumn{2}{c}{2K} & \multicolumn{5}{c}{4K} & \multicolumn{2}{c}{8K}\\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-10}\cmidrule(lr){11-12}
+Task & RoPE & ConvPE & RoPE & ConvPE & RoPE & ConvPE & RoPE-8K & YaRN-8K &ConvPE-8K & YaRN-8K &ConvPE-8K\\
 \midrule
-niah\_single\_1   & 0.614 & \textbf{0.890} & 0.004 & \textbf{0.722} & 0.000 & \textbf{0.314} & 0.030 & \textbf{0.688} \\
-niah\_single\_2   & 0.612 & \textbf{0.664} & 0.000 & \textbf{0.038} & 0.000 & 0.000 & 0.010 & \textbf{0.022} \\
-niah\_single\_3   & 0.090 & \textbf{0.180} & 0.000 & \textbf{0.014} & 0.000 & 0.000 & 0.002 & \textbf{0.010} \\
-niah\_multikey\_1 & 0.198 & \textbf{0.200} & 0.118 & \textbf{0.194} & 0.000 & \textbf{0.002} & 0.036 & \textbf{0.186} \\
-niah\_multikey\_2 & \textbf{0.002} & 0.000 & 0.000 & 0.000 & -- & -- & -- & -- \\
-niah\_multikey\_3 & 0.000 & \textbf{0.008} & 0.000 & 0.000 & -- & -- & -- & -- \\
-niah\_multiquery & 0.104 & \textbf{0.186} & 0.029 & \textbf{0.179} & 0.000 & 0.000 & 0.016 & \textbf{0.089} \\
-niah\_multivalue & 0.149 & \textbf{0.187} & 0.127 & \textbf{0.186} & 0.000 & 0.000 & 0.025 & \textbf{0.128} \\
-ruler\_vt        & \textbf{0.032} & 0.008 & 0.000 & \textbf{0.052} & 0.000 & \textbf{0.107} & 0.000 & \textbf{0.015} \\
-ruler\_cwe       & 0.002 & 0.002 & 0.000 & \textbf{0.002} & -- & -- & -- & -- \\
-ruler\_fwe       & 0.001 & \textbf{0.012} & 0.000 & \textbf{0.001} & -- & -- & -- & -- \\
-ruler\_qa\_squad & 0.148 & \textbf{0.191} & 0.078 & \textbf{0.091} & 0.017 & \textbf{0.052} & 0.064 & \textbf{0.075} \\
+niah\_single\_1   & 0.614 & \textbf{0.890} & 0.004 & \textbf{0.722} & 0.000 & \textbf{0.314} & 0.030 & 0.170 & \textbf{0.688} & 0.018 & \textbf{0.640}\\
+niah\_single\_2   & 0.612 & \textbf{0.664} & 0.000 & \textbf{0.038} & 0.000 & 0.000 & 0.010 & 0.022 & 0.022 & \textbf{0.046} & 0.024\\
+niah\_single\_3   & 0.090 & \textbf{0.180} & 0.000 & \textbf{0.014} & 0.000 & 0.000 & 0.002 & 0.002 & \textbf{0.010} & 0.008 & \textbf{0.012}\\
+niah\_multikey\_1 & 0.198 & \textbf{0.200} & 0.118 & \textbf{0.194} & 0.000 & \textbf{0.002} & 0.036 & 0.074 & \textbf{0.186} & 0.072 & \textbf{0.154}\\
+niah\_multikey\_2 & \textbf{0.002} & 0.000 & 0.000 & 0.000 & -- & -- & -- & -- & -- & -- & -- \\
+niah\_multikey\_3 & 0.000 & \textbf{0.008} & 0.000 & 0.000 & -- & -- & -- & -- & -- & -- & -- \\
+niah\_multiquery & 0.104 & \textbf{0.186} & 0.029 & \textbf{0.179} & 0.000 & 0.000 & 0.016 & 0.016 & \textbf{0.089} & 0.021 & \textbf{0.026}\\
+niah\_multivalue & 0.149 & \textbf{0.187} & 0.127 & \textbf{0.186} & 0.000 & 0.000 & 0.025 & 0.102 & \textbf{0.128} & \textbf{0.038} & 0.032\\
+ruler\_vt        & \textbf{0.032} & 0.008 & 0.000 & \textbf{0.052} & 0.000 & \textbf{0.107} & 0.000 & 0.000 & \textbf{0.015} & 0.000 & \textbf{0.025}\\
+ruler\_cwe       & 0.002 & 0.002 & 0.000 & \textbf{0.002} & -- & -- & -- & -- & -- & -- & -- \\
+ruler\_fwe       & 0.001 & \textbf{0.012} & 0.000 & \textbf{0.001} & -- & -- & -- & -- & -- & -- & -- \\
+ruler\_qa\_squad & 0.148 & \textbf{0.191} & 0.078 & \textbf{0.091} & 0.017 & \textbf{0.052} & 0.064 & \textbf{0.093} & 0.075 & \textbf{0.049} & 0.044\\
 \midrule
-Average$^\dagger$ & 0.163 & \textbf{0.211} & 0.030 & \textbf{0.123} & 0.001 & \textbf{0.040} & 0.015 & \textbf{0.101} \\
+Average$^\dagger$ & 0.163 & \textbf{0.211} & 0.030 & \textbf{0.123} & 0.001 & \textbf{0.040} & 0.015 & 0.040 & \textbf{0.101} & 0.021 & \textbf{0.080} \\ 
 \bottomrule
 \end{tabular}
-\caption{Accuracy on twelve RULER tasks~\cite{hsieh2024ruler}. The last two columns report the context-extension models evaluated at a 4K context length. Cells marked -- were not evaluated because both models were near zero on these tasks at the shorter lengths. $^\dagger$Average over all twelve tasks, with cells marked -- counted as zero.}
+\caption{Accuracy on twelve RULER tasks~\cite{hsieh2024ruler}. Cells marked -- were not evaluated because both models were near zero on these tasks at the shorter lengths. $^\dagger$Average over all twelve tasks, with cells marked -- counted as zero.}
 \label{tab:ruler}
 \end{table*}
 
-We then evaluate these models on RULER~\cite{hsieh2024ruler}, which measures long-context retrieval and reasoning on controlled synthetic tasks. \Cref{tab:ruler} shows that ConvPE outperforms on all eight distinguishable tasks except ruler\_vt at 1K. For ruler\_vt, accuracy increases with context length for the pretrained ConvPE model, but drops after context-extension training.
+We then evaluate these models on RULER~\cite{hsieh2024ruler}, which measures long-context retrieval and reasoning on controlled synthetic tasks. \Cref{tab:ruler} shows that ConvPE outperforms RoPE and YaRN on most tasks.
 
 \subsection{2D Position Embedding}
 \label{sec:cifar}

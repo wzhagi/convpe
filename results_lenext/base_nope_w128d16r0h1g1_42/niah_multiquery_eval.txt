@@ -4,6 +4,8 @@
     "alias": "niah_multiquery",
     "sample_len": 500,
     "4096,none": 0.089,
-    "4096_stderr,none": "N/A"
+    "4096_stderr,none": "N/A",
+    "8192,none": 0.026,
+    "8192_stderr,none": "N/A"
   }
 }

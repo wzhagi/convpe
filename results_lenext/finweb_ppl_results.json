@@ -5,6 +5,12 @@
       "ppl": 23.0702
     }
   },
+  "results_lenext/base_ropeyarn_42": {
+    "8192": {
+      "loss": 3.074,
+      "ppl": 21.6276
+    }
+  },
   "results_lenext/base_nope_w128d16r0h1g1_42": {
     "8192": {
       "loss": 2.9827,

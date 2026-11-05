@@ -1,0 +1,11 @@
+{
+  "niah_multikey_1": {
+    "name": "niah_multikey_1",
+    "alias": "niah_multikey_1",
+    "sample_len": 500,
+    "4096,none": 0.074,
+    "4096_stderr,none": "N/A",
+    "8192,none": 0.072,
+    "8192_stderr,none": "N/A"
+  }
+}

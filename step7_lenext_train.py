@@ -43,17 +43,19 @@ class MemmapDataset(Dataset):
 
 
 # ============ 上下文扩展微调 ============
-def run_lenext(pretrain_dir):
+def run_lenext(pretrain_dir,rope_ext=""):
     print(f"\n=== lenext fine-tune from {pretrain_dir} ===")
 
     # 直接从原文件夹读取训练好的模型；config 中的 max_seq_len 已被人工加长
     model = LanguageModel.from_pretrained(pretrain_dir)
+    if rope_ext=="yarn":
+        model.to_yarn_()
     config = model.config
     max_seq_len = config.max_seq_len
     print(f"loaded config: name={config.name}, seed={config.seed}, max_seq_len={max_seq_len}")
     print(model)
 
-    output_dir = f"results_lenext/{config.name}_{config.seed}"
+    output_dir = f"results_lenext/{config.name}{rope_ext}_{config.seed}"
 
     bin_path = "data/fineweb-13parquet-part000.bin"
     total_blocks = len(np.memmap(bin_path, dtype=np.uint16, mode="r")) // max_seq_len
@@ -71,7 +73,7 @@ def run_lenext(pretrain_dir):
         warmup_steps=500,
         max_grad_norm=4.0,
         logging_steps=100,
-        save_steps=2000,
+        save_steps=500,
         save_total_limit=1,
         report_to="none",
         dataloader_drop_last=True,
@@ -91,10 +93,19 @@ def run_lenext(pretrain_dir):
         processing_class=tokenizer,
         optimizers=(AdamMuon(model.named_parameters(),adam_lr=3e-5,muon_lr=3e-4), None),
     )
-    trainer.train()
+    trainer.train(get_latest_checkpoint(output_dir))
     trainer.save_model(output_dir)
     print(f"saved model to {output_dir}")
 
+
+def get_latest_checkpoint(output_dir):
+    if not os.path.isdir(output_dir):
+        return None
+    ckpts = [d for d in os.listdir(output_dir) if re.fullmatch(r"checkpoint-\d+", d)]
+    if not ckpts:
+        return None
+    ckpts.sort(key=lambda x: int(x.split("-")[1]))
+    return os.path.join(output_dir, ckpts[-1])
 
 # ============ Main ============
 def main():
@@ -106,7 +117,11 @@ def main():
         if not os.path.isdir(d):
             print(f"[skip] not found: {d}")
             continue
-        run_lenext(d)
+        if d == "results_pretrain/base_rope_42":
+            run_lenext(d,"yarn")
+        else:
+            run_lenext(d)
+            
 
 
 if __name__ == "__main__":

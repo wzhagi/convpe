@@ -4,6 +4,8 @@
     "alias": "ruler_vt",
     "sample_len": 500,
     "4096,none": 0.015200000000000002,
-    "4096_stderr,none": "N/A"
+    "4096_stderr,none": "N/A",
+    "8192,none": 0.025200000000000004,
+    "8192_stderr,none": "N/A"
   }
 }
