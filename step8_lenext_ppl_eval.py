@@ -8,6 +8,7 @@ from trainer_model import LanguageModel
 CHECKPOINTS = [
     # "results_lenext/base_rope_42",
     "results_lenext/base_ropeyarn_42",
+    # "results_lenext/base_ropeconvpe_42",
     "results_lenext/base_nope_w128d16r0h1g1_42",
 ]
 BIN_PATH = "data/fineweb-13parquet-part001.bin"
@@ -67,6 +68,8 @@ def main():
         print(f"===== Evaluating {checkpoint} =====")
         model = LanguageModel.from_pretrained(checkpoint).to(device)
         if "yarn" in checkpoint:
+            model.to_yarn_()
+        if "convpe" in checkpoint:
             model.to_yarn_()
         print(model)
         model.eval()

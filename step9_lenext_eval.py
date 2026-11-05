@@ -13,6 +13,7 @@ torch._dynamo.config.recompile_limit = 64
 CHECKPOINTS = [
     # "results_lenext/base_rope_42",
     "results_lenext/base_ropeyarn_42",
+    # "results_lenext/base_ropeconvpe_42",
     "results_lenext/base_nope_w128d16r0h1g1_42",
 ]
 
@@ -32,7 +33,10 @@ TASKS = [
     # "ruler_qa_hotpot",
 ]
 
-SEQ_LENGTHS = [4096, 4096*2]
+SEQ_LENGTHS = [
+    # 4096,
+    8192,
+]
 
 
 def main(name, tasks):
@@ -44,8 +48,8 @@ def main(name, tasks):
         model = LanguageModel.from_pretrained(checkpoint).to("cuda")
         if "yarn" in checkpoint:
             model.to_yarn_()
-        if "cope" in checkpoint:
-            model.to_cope_()
+        if "convpe" in checkpoint:
+            model.to_yarn_()
         print(model)
         model.eval()
         model.compile()
@@ -53,7 +57,10 @@ def main(name, tasks):
         with torch.autocast("cuda", dtype=torch.bfloat16):
             result = evaluator.simple_evaluate(
                 model=HFLM(
-                    pretrained=model, tokenizer=tokenizer, batch_size=1, max_length=10240
+                    pretrained=model,
+                    tokenizer=tokenizer,
+                    batch_size=1,
+                    max_length=10240,
                 ),
                 tasks=tasks,
                 metadata={

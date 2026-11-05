@@ -33,7 +33,7 @@
 
 \begin{abstract}
 
-ConvPE (Convolutional Position Embedding) improves both the performance and efficiency of Transformer models in language modeling, long-context extension, and vision. It injects a windowed, content-dependent bias into attention scores through a lightweight causal convolution over a low-dimensional projection of the hidden states. ConvPE is compatible with RoPE, arbitrary attention masks, and KV concatenation. It also supports high-dimensional positional embeddings via high-dimensional convolutions. In a reproduction, ConvPE outperforms five 1D baselines and eight 2D baselines. The code is publicly available at \url{https://github.com/wzhagi/convpe}.
+ConvPE (Convolutional Position Embedding) improves both the performance and efficiency of Transformer models in language modeling, long-context extension, and vision. It injects a windowed, content-dependent bias into attention scores through a lightweight causal convolution over a low-dimensional projection of the hidden states. As a lightweight plug-in, ConvPE is compatible with RoPE, attention masks, and KV concatenation. It also supports high-dimensional position embeddings via high-dimensional convolutions. In a reproduction, ConvPE outperforms five 1D baselines and eight 2D baselines. The code is publicly available at \url{https://github.com/wzhagi/convpe}.
 
 \end{abstract}
 \keywords{Position Embedding \and Language Models \and Transformers \and Attention \and Vision Transformers}
@@ -53,9 +53,9 @@ Transformers~\cite{vaswani2017attention} are insensitive to input order, whereas
 
 Position information is currently injected at one of three points. First, absolute position embeddings, whether fixed or learnable, add a position vector to token representations~\cite{vaswani2017attention,devlin2019bert,radford2019language}. Second, rotary position embedding (RoPE)~\cite{su2021roformer} rotates queries and keys so that attention scores depend on relative distance; RoPE has been widely adopted in modern large language models. Extending these methods to longer contexts requires interpolation or frequency rescaling~\cite{peng2024yarn}. Third, attention-score-bias methods add a term directly to the score matrix: ALiBi~\cite{press2021train} uses a fixed linear decay but performs worse on downstream tasks as the context length increases~\cite{kazemnejad2023impact}. CABLE~\cite{veisi2025cable} learns to modulate a fixed distance-penalty skeleton. The Composite method~\cite{chang2021convolutionsselfattentionreinterpretingrelative} adds convolution-based relative-position terms similar to ours but performs worse. DAPE~\cite{zheng2025dapev2} convolves the full score map, which is effective but incurs high computational overhead.
 
-ConvPE follows this score-bias route and generates the bias locally. It applies a causal convolution to the hidden state projections and adds the resulting windowed bias directly to the attention scores. Beyond the window the bias is exactly zero following NoPE methods~\cite{kazemnejad2023impact}, so distant keys are not penalized by construction. ConvPE is compatible with RoPE, arbitrary masks, and KV concatenation. It also supports high-dimensional position encodings through high-dimensional convolutions.
+ConvPE follows this score-bias route and generates the bias locally. It applies a causal convolution to the hidden state projections and adds the resulting windowed bias directly to the attention scores. Beyond the window the bias is exactly zero, following NoPE methods~\cite{kazemnejad2023impact}, so distant keys are not penalized by construction. As a lightweight plug-in, ConvPE is compatible with RoPE, attention masks, and KV concatenation. It also supports high-dimensional position embedding through high-dimensional convolutions.
 
-We evaluate ConvPE on language-model pretraining, downstream evaluation, long-context extension, and image classification. \Cref{fig:overview} summarizes the relative changes with respect to the RoPE baseline. Compared with RoPE, ConvPE achieves lower training and validation perplexity and higher benchmark accuracy, with minimal additional parameters and computational overhead. It reaches the baseline's final loss using fewer training tokens and less wall-clock time. After context-extension training to 8K tokens, the gap widens. This demonstrates the potential of ConvPE for long-context language modeling. In vision, ConvPE2D improves CIFAR-100 accuracy over eight baselines.
+We evaluate ConvPE on language-model pretraining, downstream evaluation, long-context extension, and image classification. \Cref{fig:overview} summarizes the relative changes with respect to the RoPE baseline. Compared with RoPE, ConvPE achieves lower training and validation perplexity and higher benchmark accuracy, with minimal additional parameters and computational overhead. It reaches the baseline's final loss using fewer training tokens and less wall-clock time. After context-extension training to 8K tokens, the gap widens. As a plug-in, it also improves pretrained RoPE models during context-extension training. This demonstrates the potential of ConvPE for long-context language modeling. In vision, ConvPE2D improves CIFAR-100 accuracy over eight baselines.
 
 \textbf{The main contributions of this paper are as follows:}
 \begin{itemize}
@@ -111,7 +111,7 @@ $\mathbf{B}_{\mathrm{ConvPE}}\in\mathbb{R}^{N\times S\times H_b\times W}$. For a
 0, & \text{otherwise},
 \end{cases}
 \end{equation}
-where $N$ is the batch size, $H$ is the number of attention heads, and $H_b$ must divide $H$. In words, head $h$ reads its bias from bias head $h\bmod H_b$, so each bias head is shared by $H/H_b$ attention heads. Each bias head therefore learns a different relative-position pattern. Future keys are removed by the causal mask, and keys older than $W$ are scored without a positional bias. \Cref{fig:convpe_method} illustrates the module and the resulting bias pattern.
+where $N$ is the batch size, $H$ is the number of attention heads, and $H_b$ must divide $H$. In other words, head $h$ reads its bias from bias head $h\bmod H_b$, so each bias head is shared by $H/H_b$ attention heads. Each bias head therefore learns a different relative-position pattern. Future keys are removed by the causal mask, and keys older than $W$ are scored without a positional bias. \Cref{fig:convpe_method} illustrates the module and the resulting bias pattern.
 
 \begin{figure}[!ht]
     \centering
@@ -220,7 +220,7 @@ Near the current token, both the static bias and the input-feature selectivity r
 Toward the far end of the window, the standard deviation is lower and the static bias is close to zero for most layers. ConvPE therefore does not impose a strong static prior at this range, leaving the decision to the convolution over the dynamic input and to the query--key semantic match.
 
 \textbf{3. Self-suppression and self-enhancement.}
-The static bias has a clear layer-wise pattern at the current position. Layer 0 shows self-enhancement with a bias of $+0.5885$, whereas every deeper layer except L4 (a near-zero $+0.0115$) shows self-suppression with a negative bias. This is consistent with deeper layers shifting attention away from the current token and toward the historical context.
+The static bias has a clear layer-wise pattern at the current position. Layer 0 shows self-enhancement with a bias of $+0.5885$, whereas every deeper layer except L4 ($+0.0115$) shows self-suppression with a negative bias. This is consistent with deeper layers shifting attention away from the current token and toward the historical context.
 
 \subsection{Downstream Evaluations}
 \label{sec:eval}
@@ -236,12 +236,12 @@ WikiText-2 & word PPL $\downarrow$ & 46.56 & \textbf{42.05} & -- \\
 LAMBADA~\cite{paperno2016lambada} & PPL $\downarrow$ & 118.10 & \textbf{88.49} & -- \\
 LAMBADA & acc $\uparrow$ & 0.2507 & \textbf{0.2604} & -- \\
 HellaSwag~\cite{zellers2019hellaswag} & acc & 0.2894 & \textbf{0.2949} & 0.25 \\
-HellaSwag & acc norm & 0.3148 & \textbf{0.3272} & 0.25 \\
+HellaSwag & acc-norm & 0.3148 & \textbf{0.3272} & 0.25 \\
 XStoryCloze~\cite{lin2022xstorycloze} & acc & 0.5460 & \textbf{0.5526} & 0.5 \\
 PIQA~\cite{bisk2020piqa} & acc & 0.6251 & \textbf{0.6338} & 0.5 \\
-PIQA & acc norm & 0.6208 & \textbf{0.6235} & 0.5 \\
+PIQA & acc-norm & 0.6208 & \textbf{0.6235} & 0.5 \\
 ARC-Easy~\cite{clark2018arc} & acc & 0.5114 & \textbf{0.5421} & 0.25 \\
-ARC-Easy & acc norm & 0.4487 & \textbf{0.4701} & 0.25 \\
+ARC-Easy & acc-norm & 0.4487 & \textbf{0.4701} & 0.25 \\
 WinoGrande~\cite{sakaguchi2019winogrande} & acc & 0.5091 & \textbf{0.5193} & 0.5 \\
 BoolQ~\cite{clark2019boolq} & acc & 0.5676 & \textbf{0.5893} & 0.5 \\
 TruthfulQA-MC1~\cite{lin2021truthfulqa} & acc & \textbf{0.2399} & 0.2375 & 0.25 \\
@@ -260,53 +260,55 @@ This section evaluates the pretrained ConvPE and RoPE models on downstream bench
 \begin{table}[!ht]
 \centering
 \small
-\begin{tabular}{lccccc}
+\begin{tabular}{lcccccc}
 \toprule
-Context & RoPE & ConvPE & RoPE-8K & YaRN-8K & ConvPE-8K \\
+Context & RoPE & ConvPE & RoPE-8K & YaRN & ConvPE-8K & YaRN-ConvPE \\
 \midrule
-1K & 22.5272 & \textbf{20.672} (-8.2\%) & -- & -- & -- \\
-2K & 23.4439 & \textbf{20.1441} (-14.1\%) & -- & -- & -- \\
-4K & 67.8413 & \textbf{20.6415} (-69.6\%) & -- & -- & -- \\
-8K & 260.4544 & \textbf{27.8015} (-89.3\%) & 23.0702 & 21.6276 & \textbf{19.7405} (-8.7\%) \\
+1K & 22.5272 & \textbf{20.672} (-8.2\%) & -- & -- & -- & -- \\
+2K & 23.4439 & \textbf{20.1441} (-14.1\%) & -- & -- & -- & -- \\
+4K & 67.8413 & \textbf{20.6415} (-69.6\%) & -- & -- & -- & -- \\
+8K & 260.4544 & \textbf{27.8015} (-89.3\%) & 23.0702 & 21.6276 & \textbf{19.7405} (-8.7\%) & 21.3539 (-1.3\%) \\
 \bottomrule
 \end{tabular}
 \caption{Validation perplexity for context lengths from 1K to 8K.}
 \label{tab:valppl}
 \end{table}
 
-We first measure language-modeling perplexity on the validation dataset at increasing context lengths. Both models are initially trained with 1K-token contexts. \Cref{tab:valppl} shows a clear advantage for ConvPE as the context length grows. The perplexity of RoPE rises sharply beyond 2K, whereas ConvPE remains stable through 4K. We further train three models, RoPE-8K, YaRN-8K, and ConvPE-8K, starting from the pretrained models on an additional 150M tokens from FineWeb-Edu-10BT with a context length of 8K. When evaluated at an 8K context length, ConvPE-8K achieves the lowest perplexity among the three models. This demonstrates the effectiveness of ConvPE for context extension.
+We first measure language-modeling perplexity on the validation dataset at increasing context lengths. Both models are initially trained with 1K-token contexts. \Cref{tab:valppl} shows a clear advantage for ConvPE as the context length grows. The perplexity of RoPE rises sharply beyond 2K, whereas ConvPE remains stable up to 4K. 
+
+We further train four models: RoPE-8K, ConvPE-8K, YaRN and YaRN-ConvPE, starting from the pretrained models on an additional 150M tokens from FineWeb-Edu-10BT using an 8K context length. When evaluated at an 8K context length, ConvPE-8K achieves the lowest perplexity among the models. These results demonstrate the effectiveness of ConvPE for context extension.
+
+We then evaluate these models on RULER~\cite{hsieh2024ruler}, which measures long-context retrieval and reasoning on controlled synthetic tasks. \Cref{tab:ruler} shows that ConvPE outperforms RoPE and YaRN on most tasks.
 
 \begin{table*}[!ht]
 \centering
 \small
 \setlength{\tabcolsep}{4pt}
-\begin{tabular}{lccccccccccc}
+\begin{tabular}{lcccccccccccc}
 \toprule
-& \multicolumn{2}{c}{1K} & \multicolumn{2}{c}{2K} & \multicolumn{5}{c}{4K} & \multicolumn{2}{c}{8K}\\
-\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-10}\cmidrule(lr){11-12}
-Task & RoPE & ConvPE & RoPE & ConvPE & RoPE & ConvPE & RoPE-8K & YaRN-8K &ConvPE-8K & YaRN-8K &ConvPE-8K\\
+& \multicolumn{2}{c}{1K} & \multicolumn{2}{c}{2K} & \multicolumn{5}{c}{4K} & \multicolumn{3}{c}{8K}\\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-10}\cmidrule(lr){11-13}
+Task & RoPE & Conv & RoPE & Conv & RoPE & Conv & Ro8K & YaRN &Co8K & YaRN &Co8K & YaRN-ConvPE \\
 \midrule
-niah\_single\_1   & 0.614 & \textbf{0.890} & 0.004 & \textbf{0.722} & 0.000 & \textbf{0.314} & 0.030 & 0.170 & \textbf{0.688} & 0.018 & \textbf{0.640}\\
-niah\_single\_2   & 0.612 & \textbf{0.664} & 0.000 & \textbf{0.038} & 0.000 & 0.000 & 0.010 & 0.022 & 0.022 & \textbf{0.046} & 0.024\\
-niah\_single\_3   & 0.090 & \textbf{0.180} & 0.000 & \textbf{0.014} & 0.000 & 0.000 & 0.002 & 0.002 & \textbf{0.010} & 0.008 & \textbf{0.012}\\
-niah\_multikey\_1 & 0.198 & \textbf{0.200} & 0.118 & \textbf{0.194} & 0.000 & \textbf{0.002} & 0.036 & 0.074 & \textbf{0.186} & 0.072 & \textbf{0.154}\\
-niah\_multikey\_2 & \textbf{0.002} & 0.000 & 0.000 & 0.000 & -- & -- & -- & -- & -- & -- & -- \\
-niah\_multikey\_3 & 0.000 & \textbf{0.008} & 0.000 & 0.000 & -- & -- & -- & -- & -- & -- & -- \\
-niah\_multiquery & 0.104 & \textbf{0.186} & 0.029 & \textbf{0.179} & 0.000 & 0.000 & 0.016 & 0.016 & \textbf{0.089} & 0.021 & \textbf{0.026}\\
-niah\_multivalue & 0.149 & \textbf{0.187} & 0.127 & \textbf{0.186} & 0.000 & 0.000 & 0.025 & 0.102 & \textbf{0.128} & \textbf{0.038} & 0.032\\
-ruler\_vt        & \textbf{0.032} & 0.008 & 0.000 & \textbf{0.052} & 0.000 & \textbf{0.107} & 0.000 & 0.000 & \textbf{0.015} & 0.000 & \textbf{0.025}\\
-ruler\_cwe       & 0.002 & 0.002 & 0.000 & \textbf{0.002} & -- & -- & -- & -- & -- & -- & -- \\
-ruler\_fwe       & 0.001 & \textbf{0.012} & 0.000 & \textbf{0.001} & -- & -- & -- & -- & -- & -- & -- \\
-ruler\_qa\_squad & 0.148 & \textbf{0.191} & 0.078 & \textbf{0.091} & 0.017 & \textbf{0.052} & 0.064 & \textbf{0.093} & 0.075 & \textbf{0.049} & 0.044\\
+niah\_single\_1   & 0.614 & \textbf{0.890} & 0.004 & \textbf{0.722} & 0.000 & \textbf{0.314} & 0.030 & 0.170 & \textbf{0.688} & 0.018 & \textbf{0.640} & 0.040 \\
+niah\_single\_2   & 0.612 & \textbf{0.664} & 0.000 & \textbf{0.038} & 0.000 & 0.000 & 0.010 & 0.022 & 0.022 & 0.046 & 0.024 & \textbf{0.052} \\
+niah\_single\_3   & 0.090 & \textbf{0.180} & 0.000 & \textbf{0.014} & 0.000 & 0.000 & 0.002 & 0.002 & \textbf{0.010} & 0.008 & \textbf{0.012} & 0.004 \\
+niah\_multikey\_1 & 0.198 & \textbf{0.200} & 0.118 & \textbf{0.194} & 0.000 & \textbf{0.002} & 0.036 & 0.074 & \textbf{0.186} & 0.072 & \textbf{0.154} & 0.094 \\
+niah\_multikey\_2 & \textbf{0.002} & 0.000 & 0.000 & 0.000 & -- & -- & -- & -- & -- & -- & -- & -- \\
+niah\_multikey\_3 & 0.000 & \textbf{0.008} & 0.000 & 0.000 & -- & -- & -- & -- & -- & -- & -- & -- \\
+niah\_multiquery & 0.104 & \textbf{0.186} & 0.029 & \textbf{0.179} & 0.000 & 0.000 & 0.016 & 0.016 & \textbf{0.089} & 0.021 & \textbf{0.026} & 0.022 \\
+niah\_multivalue & 0.149 & \textbf{0.187} & 0.127 & \textbf{0.186} & 0.000 & 0.000 & 0.025 & 0.102 & \textbf{0.128} & \textbf{0.038} & 0.032 & 0.036 \\
+ruler\_vt        & \textbf{0.032} & 0.008 & 0.000 & \textbf{0.052} & 0.000 & \textbf{0.107} & 0.000 & 0.000 & \textbf{0.015} & 0.000 & \textbf{0.025} & 0.000 \\
+ruler\_cwe       & 0.002 & 0.002 & 0.000 & \textbf{0.002} & -- & -- & -- & -- & -- & -- & -- & -- \\
+ruler\_fwe       & 0.001 & \textbf{0.012} & 0.000 & \textbf{0.001} & -- & -- & -- & -- & -- & -- & -- & -- \\
+ruler\_qa\_squad & 0.148 & \textbf{0.191} & 0.078 & \textbf{0.091} & 0.017 & \textbf{0.052} & 0.064 & \textbf{0.093} & 0.075 & 0.049 & 0.044 & \textbf{0.053} \\
 \midrule
-Average$^\dagger$ & 0.163 & \textbf{0.211} & 0.030 & \textbf{0.123} & 0.001 & \textbf{0.040} & 0.015 & 0.040 & \textbf{0.101} & 0.021 & \textbf{0.080} \\ 
+Average$^\dagger$ & 0.163 & \textbf{0.211} & 0.030 & \textbf{0.123} & 0.001 & \textbf{0.040} & 0.015 & 0.040 & \textbf{0.101} & 0.021 & \textbf{0.080} & 0.025\\ 
 \bottomrule
 \end{tabular}
-\caption{Accuracy on twelve RULER tasks~\cite{hsieh2024ruler}. Cells marked -- were not evaluated because both models were near zero on these tasks at the shorter lengths. $^\dagger$Average over all twelve tasks, with cells marked -- counted as zero.}
+\caption{Accuracy on twelve RULER tasks~\cite{hsieh2024ruler}. Conv denotes ConvPE; Ro8K denotes RoPE-8K; Co8K denotes ConvPE-8K. Cells marked -- were not evaluated because both models were near zero on these tasks at the shorter lengths. $^\dagger$Average over all twelve tasks, with cells marked -- counted as zero.}
 \label{tab:ruler}
 \end{table*}
-
-We then evaluate these models on RULER~\cite{hsieh2024ruler}, which measures long-context retrieval and reasoning on controlled synthetic tasks. \Cref{tab:ruler} shows that ConvPE outperforms RoPE and YaRN on most tasks.
 
 \subsection{2D Position Embedding}
 \label{sec:cifar}
@@ -365,7 +367,7 @@ ConvPE    & 166.764 & 156.00 & 11.21 & \underline{20.52} & \underline{19.95} & 2
 
 DAPE V2 convolves the full attention score map, so it is $1.84\times$ slower per step than RoPE ($273.71$ vs.\ $149.03$ ms) and uses $20.25$ GiB of training memory compared with $10.77$ GiB for RoPE. Because it requires materializing the full score map, it cannot use FlashAttention and incurs quadratic complexity in the sequence length. These costs make DAPE V2 unsuitable for long-context training.
 
-ALiBi~\cite{press2021train} and CABLE~\cite{veisi2025cable} are cheaper, but both retain a distance-penalty form. This prior is reasonable for local language modeling, but it conflicts with long-context retrieval, where the relevant evidence may lie far from the query. Prior work supports this concern: Kazemnejad et al.~\cite{kazemnejad2023impact} find that ALiBi and other explicit position encodings are not well suited for length generalization on downstream tasks. RULER exhibits the same pattern in our reproduction: ConvPE outperforms both ALiBi and CABLE at every length.
+ALiBi~\cite{press2021train} and CABLE~\cite{veisi2025cable} are cheaper, but both retain a distance-penalty form. This prior is reasonable for local language modeling, but it conflicts with long-context retrieval, where the relevant evidence may lie far from the query. Prior work supports this concern: Kazemnejad et al.~\cite{kazemnejad2023impact} find that ALiBi and other explicit position embedding methods are not well suited for length generalization on downstream tasks. RULER exhibits the same pattern in our reproduction: ConvPE outperforms both ALiBi and CABLE at every length.
 
 \begin{table}[!ht]
 \centering
@@ -395,7 +397,7 @@ ConvPE2D           & 5.377 & 82.03 & \textbf{67.98} \\
 \section{Conclusions and Future Work}
 \label{sec:conclusion}
 
-ConvPE adds a learned, windowed bias to attention scores which is compatible with RoPE, various attention masks, and KV-cache concatenation, and it naturally supports multidimensional extensions. In our experiments it improves pretraining and validation perplexity, evaluation accuracy, context extension perplexity and accuracy, and CIFAR accuracy at a small parameter and computational overhead. Among the compared methods, ConvPE combines competitive downstream accuracy with a FlashAttention-compatible design; when accuracy, parameter count, per-step cost, and compatibility are considered jointly, it is the most favorable choice for long-context training.
+ConvPE adds a learned, windowed bias to attention scores which is compatible with RoPE, attention masks, and KV concatenation, and it naturally supports multidimensional extensions. In our experiments it improves pretraining and validation perplexity, evaluation accuracy, context extension perplexity and accuracy, and CIFAR accuracy at a small parameter and computational overhead. Among the compared methods, ConvPE combines competitive downstream accuracy with a FlashAttention-compatible design; when accuracy, parameter count, per-step cost, and compatibility are considered jointly, it is the most favorable choice for long-context training.
 
 Our study has two main limitations. First, the main experiments use a single seed and models of up to $167$M parameters, so the size of the gains at larger scale is unknown. Second, the max context length evaluated is 8K. We view these as directions for future work:
 

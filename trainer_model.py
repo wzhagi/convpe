@@ -78,13 +78,24 @@ class LanguageModel(PreTrainedModel, GenerationMixin):
             loss, logits, current_key_values if use_cache else None
         )
 
-    def set_rope(self, rope):
-        self.rope = rope
-        for attn in self.transformer.attns:
-            attn.rope = rope
-
     def to_yarn_(self):
-        self.set_rope(YaRN())
+        self.rope = YaRN()
+        for attn in self.transformer.attns:
+            attn.rope = self.rope
 
-    def to_cope_(self):
-        self.set_rope(CoPE())
+    def to_convpe_(self):
+        self.config.convpe_win = 128
+        self.config.convpe_dim = 16
+        self.config.convpe_heads = 1
+        self.config.convpe_rank = 0
+        self.config.convpe_groups = 1
+        self.config.convpe_share = False
+        for attn in self.transformer.attns:
+            attn.convpe = ConvPE(
+                self.config.dim_model,
+                self.config.convpe_win,
+                self.config.convpe_dim,
+            )
+            with torch.no_grad():
+                attn.convpe.conv.weight.zero_()
+                attn.convpe.conv.bias.zero_()

@@ -50,6 +50,9 @@ def run_lenext(pretrain_dir,rope_ext=""):
     model = LanguageModel.from_pretrained(pretrain_dir)
     if rope_ext=="yarn":
         model.to_yarn_()
+    if rope_ext=="convpe":
+        model.to_yarn_()
+        model.to_convpe_()
     config = model.config
     max_seq_len = config.max_seq_len
     print(f"loaded config: name={config.name}, seed={config.seed}, max_seq_len={max_seq_len}")
@@ -119,6 +122,7 @@ def main():
             continue
         if d == "results_pretrain/base_rope_42":
             run_lenext(d,"yarn")
+            # run_lenext(d,"convpe")
         else:
             run_lenext(d)
             

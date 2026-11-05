@@ -40,12 +40,12 @@ ConvPE (Convolutional Position Embedding) improves both the performance and effi
 
 FineWeb-Edu-10BT validation language-modeling perplexity:
 
-| Context | RoPE | ConvPE | RoPE-8K | YaRN-8K | ConvPE-8K |
-|:---:|:---:|:---:|:---:|:---:|:---:|
-| 1K | 22.5272 | **20.672 (-8.2%)** | -- | -- | -- |
-| 2K | 23.4439 | **20.1441 (-14.1%)** | -- | -- | -- |
-| 4K | 67.8413 | **20.6415 (-69.6%)** | -- | -- | -- |
-| 8K | 260.4544 | **27.8015 (-89.3%)** | 23.0702 | 21.6276 | **19.7405 (-8.7%)** |
+| Context | RoPE | ConvPE | RoPE-8K | YaRN-8K | ConvPE-8K | YaRN-ConvPE |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| 1K | 22.5272 | **20.672 (-8.2%)** | -- | -- | -- | -- |
+| 2K | 23.4439 | **20.1441 (-14.1%)** | -- | -- | -- | -- |
+| 4K | 67.8413 | **20.6415 (-69.6%)** | -- | -- | -- | -- |
+| 8K | 260.4544 | **27.8015 (-89.3%)** | 23.0702 | 21.6276 | **19.7405 (-8.7%)** | 21.3539 (-1.3%) |
 
 The 8K suffix denotes models continually trained with a context length of 8192.
 
