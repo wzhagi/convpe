@@ -11,7 +11,7 @@ from trainer_model import LanguageModel
 torch._dynamo.config.recompile_limit = 64
 
 CHECKPOINTS = [
-    "results_lenext/base_rope_42",
+    # "results_lenext/base_rope_42",
     "results_lenext/base_ropeyarn_42",
     "results_lenext/base_nope_w128d16r0h1g1_42",
 ]

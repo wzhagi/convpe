@@ -6,7 +6,7 @@ from trainer_model import LanguageModel
 
 # ============ 配置 ============
 CHECKPOINTS = [
-    "results_lenext/base_rope_42",
+    # "results_lenext/base_rope_42",
     "results_lenext/base_ropeyarn_42",
     "results_lenext/base_nope_w128d16r0h1g1_42",
 ]
