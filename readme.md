@@ -170,7 +170,7 @@ https://www.modelscope.cn/datasets/AI-ModelScope/fineweb-edu/tree/master/sample/
 
 #### Edit model max_seq_len in config.json to 8192
 
-    python3 step4_len_ext_eval.py
+    python3 step4_lenext_eval.py
 
 #### Run step4_plot.ipynb to see results.
 
@@ -179,8 +179,8 @@ https://www.modelscope.cn/datasets/AI-ModelScope/fineweb-edu/tree/master/sample/
 #### download 013_00000.parquet into data/fineweb-edu-10BT
 #### Edit model max_seq_len in config.json to 8192
     python3 step5_prepare_len_ext_parquet.py
-    python3 step6_len_ext_ppl_eval.py
-    python3 step7_len_ext_train.py
-    python3 step8_len_ext_ppl_eval.py
-    python3 step9_len_ext_eval.py
+    python3 step6_lenext_ppl_eval.py
+    python3 step7_lenext_train.py
+    python3 step8_lenext_ppl_eval.py
+    python3 step9_lenext_eval.py
 
