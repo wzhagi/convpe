@@ -132,7 +132,10 @@ class MultiHeadSelfAttention(nn.Module):
             q = self.rope(q)
             k = self.rope(k)
         score_bias = None if self.convpe is None else self.convpe(x, H, W)
-        o = convpe2d_attention(q, k, v, score_bias)
+        if score_bias is None:
+            o = F.scaled_dot_product_attention(q, k, v)
+        else:
+            o = convpe2d_attention(q, k, v, score_bias)
         return self.wo(o.transpose(-2, -3).flatten(-2))
 
 
